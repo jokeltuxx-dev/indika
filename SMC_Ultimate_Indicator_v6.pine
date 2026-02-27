@@ -1,123 +1,124 @@
 // This Pine Script™ code is subject to the terms of the Mozilla Public License 2.0 at https://mozilla.org/MPL/2.0/
-// © SMC Ultimate Trading Toolkit v6
+// © SMC Ultimate Trading Toolkit v6 — All-in-One Institutional Market Scanner
 
 //@version=6
-indicator("SMC Ultimate Trading Toolkit", shorttitle="SMC Ultimate", overlay=true, max_lines_count=500, max_boxes_count=500, max_labels_count=500, max_bars_back=5000)
+indicator("All-in-One Institutional Market Scanner", shorttitle="SMC Scanner", overlay=true, max_lines_count=500, max_boxes_count=500, max_labels_count=500, max_bars_back=5000)
 
 // ══════════════════════════════════════════════════════════════════════════════
-// ░░░░░░░░░░░░░░░░░░░░░░░░░░ GLOBAL SETTINGS ░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
+// ░░░░░░░░░░░░░░░░░░░░░░░░░░ MODULE TOGGLES ░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
 // ══════════════════════════════════════════════════════════════════════════════
 
-// --- Module Toggles ---
 grp_modules = "═══ MODULE TOGGLES ═══"
-show_structure     = input.bool(true,  "Structure (BOS/CHoCH)",       group=grp_modules)
-show_orderblocks   = input.bool(true,  "Order Blocks",                group=grp_modules)
-show_sd_zones      = input.bool(true,  "Supply/Demand Zones",         group=grp_modules)
-show_fvg           = input.bool(true,  "Fair Value Gaps (FVG)",       group=grp_modules)
-show_liquidity     = input.bool(true,  "Liquidity Levels",            group=grp_modules)
-show_sweep         = input.bool(true,  "Liquidity Sweep → Reversal",  group=grp_modules)
-show_diagonal      = input.bool(true,  "Diagonal Trend Lines",        group=grp_modules)
-show_confluence    = input.bool(true,  "Confluence Detection",         group=grp_modules)
-show_premium_disc  = input.bool(true,  "Premium/Discount Zones",      group=grp_modules)
-show_market_phase  = input.bool(true,  "Market Phase Detector",       group=grp_modules)
-show_volume_climax = input.bool(true,  "Volume Climax/Exhaustion",    group=grp_modules)
-show_ote           = input.bool(true,  "OTE (Optimal Trade Entry)",   group=grp_modules)
-show_mitigation    = input.bool(true,  "Mitigation Levels",           group=grp_modules)
-show_alerts        = input.bool(true,  "Alert Signals",               group=grp_modules)
-
-// --- Swing Detection Settings ---
-grp_swing = "═══ SWING DETECTION ═══"
-swing_length = input.int(5, "Swing Length", minval=2, maxval=50, group=grp_swing)
-swing_strength = input.int(3, "Swing Strength (bars)", minval=1, maxval=20, group=grp_swing)
-
-// --- Structure Settings ---
-grp_struct = "═══ STRUCTURE (BOS/CHoCH) ═══"
-struct_label_size = input.string("small", "Label Size", options=["tiny","small","normal","large"], group=grp_struct)
-bos_color_bull = input.color(color.new(#00E676, 0), "BOS Bullish Color", group=grp_struct)
-bos_color_bear = input.color(color.new(#FF5252, 0), "BOS Bearish Color", group=grp_struct)
-choch_color_bull = input.color(color.new(#00BCD4, 0), "CHoCH Bullish Color", group=grp_struct)
-choch_color_bear = input.color(color.new(#FF9800, 0), "CHoCH Bearish Color", group=grp_struct)
-
-// --- Order Block Settings ---
-grp_ob = "═══ ORDER BLOCKS ═══"
-ob_lookback = input.int(20, "OB Lookback", minval=5, maxval=100, group=grp_ob)
-ob_bull_color = input.color(color.new(#00E676, 75), "Bullish OB Color", group=grp_ob)
-ob_bear_color = input.color(color.new(#FF5252, 75), "Bearish OB Color", group=grp_ob)
-ob_max_display = input.int(10, "Max OBs Displayed", minval=1, maxval=30, group=grp_ob)
-ob_mitigation_check = input.bool(true, "Check OB Mitigation", group=grp_ob)
-
-// --- Supply/Demand Settings ---
-grp_sd = "═══ SUPPLY/DEMAND ZONES ═══"
-sd_impulse_mult = input.float(1.5, "Impulse Multiplier (ATR)", minval=0.5, maxval=5.0, step=0.1, group=grp_sd)
-sd_fresh_color_bull = input.color(color.new(#00C853, 80), "Fresh Demand Color", group=grp_sd)
-sd_fresh_color_bear = input.color(color.new(#D50000, 80), "Fresh Supply Color", group=grp_sd)
-sd_tested_color_bull = input.color(color.new(#00C853, 90), "Tested Demand Color", group=grp_sd)
-sd_tested_color_bear = input.color(color.new(#D50000, 90), "Tested Supply Color", group=grp_sd)
-sd_max_zones = input.int(8, "Max S/D Zones", minval=1, maxval=20, group=grp_sd)
-
-// --- FVG Settings ---
-grp_fvg = "═══ FAIR VALUE GAPS ═══"
-fvg_bull_color = input.color(color.new(#2196F3, 80), "Bullish FVG Color", group=grp_fvg)
-fvg_bear_color = input.color(color.new(#E040FB, 80), "Bearish FVG Color", group=grp_fvg)
-fvg_max_display = input.int(10, "Max FVGs Displayed", minval=1, maxval=30, group=grp_fvg)
-fvg_filter_atr = input.bool(true, "Filter Small FVGs (ATR)", group=grp_fvg)
-fvg_atr_mult = input.float(0.1, "Min FVG Size (ATR mult)", minval=0.01, maxval=1.0, step=0.01, group=grp_fvg)
-
-// --- Liquidity Settings ---
-grp_liq = "═══ LIQUIDITY ═══"
-liq_lookback = input.int(50, "Liquidity Lookback", minval=10, maxval=200, group=grp_liq)
-liq_color_high = input.color(color.new(#FFD600, 30), "Liquidity High Color", group=grp_liq)
-liq_color_low = input.color(color.new(#FFD600, 30), "Liquidity Low Color", group=grp_liq)
-liq_sweep_pips = input.float(0.5, "Sweep Threshold (ATR mult)", minval=0.1, maxval=3.0, step=0.1, group=grp_liq)
-
-// --- Diagonal Lines Settings ---
-grp_diag = "═══ DIAGONAL LINES ═══"
-diag_lookback = input.int(50, "Diagonal Lookback", minval=10, maxval=200, group=grp_diag)
-diag_extend = input.bool(true, "Extend Lines", group=grp_diag)
-diag_bull_color = input.color(color.new(#00E676, 30), "Bullish Trendline", group=grp_diag)
-diag_bear_color = input.color(color.new(#FF5252, 30), "Bearish Trendline", group=grp_diag)
-diag_break_signal = input.bool(true, "Show Break Signals", group=grp_diag)
-
-// --- Confluence Settings ---
-grp_conf = "═══ CONFLUENCE ═══"
-conf_min_factors = input.int(2, "Min Factors for Confluence", minval=2, maxval=5, group=grp_conf)
-conf_zone_atr_mult = input.float(1.0, "Zone Width (ATR mult)", minval=0.1, maxval=3.0, step=0.1, group=grp_conf)
-conf_strong_color = input.color(color.new(#FFD600, 50), "Strong Confluence Color", group=grp_conf)
-
-// --- Premium/Discount Settings ---
-grp_pd = "═══ PREMIUM/DISCOUNT ═══"
-pd_premium_color = input.color(color.new(#FF5252, 92), "Premium Zone Color", group=grp_pd)
-pd_discount_color = input.color(color.new(#00E676, 92), "Discount Zone Color", group=grp_pd)
-pd_eq_color = input.color(color.new(#9E9E9E, 85), "Equilibrium Color", group=grp_pd)
-
-// --- Market Phase Settings ---
-grp_phase = "═══ MARKET PHASE ═══"
-phase_lookback = input.int(50, "Phase Lookback", minval=20, maxval=200, group=grp_phase)
-phase_adr_period = input.int(14, "ADR Period", minval=5, maxval=50, group=grp_phase)
-phase_label_pos = input.string("Top Right", "Label Position", options=["Top Right","Top Left","Bottom Right","Bottom Left"], group=grp_phase)
-
-// --- Volume Settings ---
-grp_vol = "═══ VOLUME CLIMAX ═══"
-vol_sma_len = input.int(20, "Volume SMA Length", minval=5, maxval=100, group=grp_vol)
-vol_climax_mult = input.float(2.0, "Climax Multiplier", minval=1.0, maxval=5.0, step=0.1, group=grp_vol)
-vol_exhaust_mult = input.float(2.5, "Exhaustion Multiplier", minval=1.5, maxval=5.0, step=0.1, group=grp_vol)
-vol_climax_color = input.color(color.new(#FFD600, 0), "Climax Color", group=grp_vol)
-vol_exhaust_color = input.color(color.new(#E040FB, 0), "Exhaustion Color", group=grp_vol)
-
-// --- OTE Settings ---
-grp_ote = "═══ OTE (OPTIMAL TRADE ENTRY) ═══"
-ote_fib_start = input.float(0.62, "OTE Start (Fib)", minval=0.5, maxval=0.8, step=0.01, group=grp_ote)
-ote_fib_end = input.float(0.79, "OTE End (Fib)", minval=0.6, maxval=0.9, step=0.01, group=grp_ote)
-ote_bull_color = input.color(color.new(#00BCD4, 80), "Bullish OTE Color", group=grp_ote)
-ote_bear_color = input.color(color.new(#FF9800, 80), "Bearish OTE Color", group=grp_ote)
+show_diagonal      = input.bool(true,  "① Diagonal Trend Lines",        group=grp_modules, inline="m1")
+show_confluence    = input.bool(true,  "② Confluence Engine",            group=grp_modules, inline="m2")
+show_sd_zones      = input.bool(true,  "③ Supply / Demand Zones",       group=grp_modules, inline="m3")
+show_structure     = input.bool(true,  "④ Market Structure (BOS/CHoCH)", group=grp_modules, inline="m4")
+show_orderblocks   = input.bool(true,  "⑤ Order Blocks",                group=grp_modules, inline="m5")
+show_liquidity     = input.bool(true,  "⑥ Liquidity & Sweeps",          group=grp_modules, inline="m6")
+show_fvg           = input.bool(true,  "⑦ FVG / Imbalances",            group=grp_modules, inline="m7")
+show_ote           = input.bool(true,  "⑦ OTE Zones (Fibonacci)",       group=grp_modules, inline="m7b")
+show_sweep_rev     = input.bool(true,  "⑧ Sweep + Reversal Trigger",    group=grp_modules, inline="m8")
+show_premium_disc  = input.bool(true,  "⑨ Premium / Discount Zones",    group=grp_modules, inline="m9")
+show_market_phase  = input.bool(true,  "⑩ Market Phase Detector",       group=grp_modules, inline="m10")
+show_volume_climax = input.bool(true,  "⑪ Volume Climax & Exhaustion",  group=grp_modules, inline="m11")
 
 // ══════════════════════════════════════════════════════════════════════════════
-// ░░░░░░░░░░░░░░░░░░░░░░░░░░ HELPER FUNCTIONS ░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
+// ░░░░░░░░░░░░░░░░░░░░░░░░░░ SETTINGS GROUPS ░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
+// ══════════════════════════════════════════════════════════════════════════════
+
+// --- Swing Detection ---
+grp_swing = "═══ SWING DETECTION ═══"
+swing_length   = input.int(5,  "Pivot Length",         minval=2, maxval=50, group=grp_swing, inline="sw1")
+
+// --- Structure ---
+grp_struct = "═══ ④ STRUCTURE (BOS / CHoCH) ═══"
+struct_label_size = input.string("small", "Label Size", options=["tiny","small","normal","large"], group=grp_struct, inline="st1")
+bos_color_bull    = input.color(color.new(#00E676, 0),  "BOS Bull",   group=grp_struct, inline="st2")
+bos_color_bear    = input.color(color.new(#FF5252, 0),  "BOS Bear",   group=grp_struct, inline="st2")
+choch_color_bull  = input.color(color.new(#00BCD4, 0),  "CHoCH Bull", group=grp_struct, inline="st3")
+choch_color_bear  = input.color(color.new(#FF9800, 0),  "CHoCH Bear", group=grp_struct, inline="st3")
+
+// --- Order Blocks ---
+grp_ob = "═══ ⑤ ORDER BLOCKS ═══"
+ob_bull_color       = input.color(color.new(#00E676, 75), "Bull OB",        group=grp_ob, inline="ob1")
+ob_bear_color       = input.color(color.new(#FF5252, 75), "Bear OB",        group=grp_ob, inline="ob1")
+ob_max_display      = input.int(10, "Max OBs",            minval=1, maxval=30,  group=grp_ob, inline="ob2")
+ob_mitigation_pct   = input.float(50.0, "Mitigation %",   minval=10, maxval=100, step=5, group=grp_ob, inline="ob2")
+
+// --- Supply / Demand ---
+grp_sd = "═══ ③ SUPPLY / DEMAND ═══"
+sd_impulse_mult      = input.float(1.5, "Impulse ATR Mult",  minval=0.5, maxval=5.0, step=0.1, group=grp_sd, inline="sd1")
+sd_fresh_color_bull  = input.color(color.new(#00C853, 80),    "Fresh Demand",    group=grp_sd, inline="sd2")
+sd_fresh_color_bear  = input.color(color.new(#D50000, 80),    "Fresh Supply",    group=grp_sd, inline="sd2")
+sd_tested_color_bull = input.color(color.new(#00C853, 90),    "Tested Demand",   group=grp_sd, inline="sd3")
+sd_tested_color_bear = input.color(color.new(#D50000, 90),    "Tested Supply",   group=grp_sd, inline="sd3")
+sd_max_zones         = input.int(8, "Max Zones",             minval=1, maxval=20,  group=grp_sd, inline="sd4")
+
+// --- FVG ---
+grp_fvg = "═══ ⑦ FAIR VALUE GAPS ═══"
+fvg_bull_color    = input.color(color.new(#2196F3, 80), "Bull FVG",       group=grp_fvg, inline="fvg1")
+fvg_bear_color    = input.color(color.new(#E040FB, 80), "Bear FVG",       group=grp_fvg, inline="fvg1")
+fvg_max_display   = input.int(10, "Max FVGs",           minval=1, maxval=30,  group=grp_fvg, inline="fvg2")
+fvg_filter_atr    = input.bool(true, "Filter Small (ATR)", group=grp_fvg, inline="fvg2")
+fvg_atr_mult      = input.float(0.1, "Min Size (ATR×)",    minval=0.01, maxval=1.0, step=0.01, group=grp_fvg, inline="fvg3")
+
+// --- Liquidity ---
+grp_liq = "═══ ⑥ LIQUIDITY ═══"
+liq_lookback       = input.int(50, "Lookback Bars",       minval=10, maxval=200, group=grp_liq, inline="lq1")
+liq_color          = input.color(color.new(#FFD600, 30),  "Level Color",        group=grp_liq, inline="lq1")
+liq_eq_tolerance   = input.float(0.2, "Equal H/L ATR Tol", minval=0.01, maxval=1.0, step=0.05, group=grp_liq, inline="lq2")
+liq_max_display    = input.int(15, "Max Levels",           minval=5, maxval=40,  group=grp_liq, inline="lq2")
+
+// --- Diagonal Lines ---
+grp_diag = "═══ ① DIAGONAL LINES ═══"
+diag_bull_color    = input.color(color.new(#00E676, 30), "Bull Trendline",  group=grp_diag, inline="dg1")
+diag_bear_color    = input.color(color.new(#FF5252, 30), "Bear Trendline",  group=grp_diag, inline="dg1")
+diag_extend        = input.bool(true, "Extend Lines",      group=grp_diag, inline="dg2")
+diag_break_signal  = input.bool(true, "Show Break Signals", group=grp_diag, inline="dg2")
+
+// --- Confluence ---
+grp_conf = "═══ ② CONFLUENCE ═══"
+conf_min_factors     = input.int(2,    "Min Factors",         minval=2, maxval=5,    group=grp_conf, inline="cf1")
+conf_zone_atr_mult   = input.float(1.0, "Zone Width (ATR×)",  minval=0.1, maxval=3.0, step=0.1, group=grp_conf, inline="cf1")
+conf_strong_color    = input.color(color.new(#FFD600, 50),     "Confluence Color",    group=grp_conf, inline="cf2")
+
+// --- Premium / Discount ---
+grp_pd = "═══ ⑨ PREMIUM / DISCOUNT ═══"
+pd_premium_color   = input.color(color.new(#FF5252, 92), "Premium BG",     group=grp_pd, inline="pd1")
+pd_discount_color  = input.color(color.new(#00E676, 92), "Discount BG",    group=grp_pd, inline="pd1")
+pd_show_bg         = input.bool(true, "Show Background",   group=grp_pd, inline="pd2")
+
+// --- Market Phase ---
+grp_phase = "═══ ⑩ MARKET PHASE ═══"
+phase_lookback    = input.int(50, "Phase Lookback",    minval=20, maxval=200, group=grp_phase, inline="ph1")
+phase_adr_period  = input.int(14, "ADR Period",        minval=5,  maxval=50,  group=grp_phase, inline="ph1")
+phase_tbl_pos     = input.string("Top Right", "Table Position", options=["Top Right","Top Left","Bottom Right","Bottom Left"], group=grp_phase, inline="ph2")
+
+// --- Volume ---
+grp_vol = "═══ ⑪ VOLUME CLIMAX ═══"
+vol_sma_len       = input.int(20,    "Volume SMA Length",   minval=5, maxval=100,  group=grp_vol, inline="vl1")
+vol_climax_mult   = input.float(2.0, "Climax Mult",         minval=1.0, maxval=5.0, step=0.1, group=grp_vol, inline="vl1")
+vol_climax_color  = input.color(color.new(#FFD600, 0),       "Climax",              group=grp_vol, inline="vl2")
+vol_exhaust_color = input.color(color.new(#E040FB, 0),       "Exhaustion",          group=grp_vol, inline="vl2")
+
+// --- OTE ---
+grp_ote = "═══ ⑦b OTE (OPTIMAL TRADE ENTRY) ═══"
+ote_fib_start     = input.float(0.618, "OTE Fib Start",  minval=0.5, maxval=0.8, step=0.001, group=grp_ote, inline="ot1")
+ote_fib_end       = input.float(0.786, "OTE Fib End",    minval=0.6, maxval=0.9, step=0.001, group=grp_ote, inline="ot1")
+ote_bull_color    = input.color(color.new(#00BCD4, 80),   "Bull OTE",             group=grp_ote, inline="ot2")
+ote_bear_color    = input.color(color.new(#FF9800, 80),   "Bear OTE",             group=grp_ote, inline="ot2")
+
+// --- Dashboard ---
+grp_dash = "═══ DASHBOARD ═══"
+show_dashboard    = input.bool(true, "Show Dashboard",     group=grp_dash, inline="ds1")
+dash_position     = input.string("Bottom Right", "Position", options=["Top Right","Top Left","Bottom Right","Bottom Left"], group=grp_dash, inline="ds1")
+
+// ══════════════════════════════════════════════════════════════════════════════
+// ░░░░░░░░░░░░░░░░░░░░░░░░░░ GLOBAL HELPERS ░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
 // ══════════════════════════════════════════════════════════════════════════════
 
 atr_val = ta.atr(14)
 
-// Label size helper
 get_label_size(s) =>
     switch s
         "tiny"   => size.tiny
@@ -126,844 +127,854 @@ get_label_size(s) =>
         "large"  => size.large
         => size.small
 
-lbl_size = get_label_size(struct_label_size)
+lbl_sz = get_label_size(struct_label_size)
 
-// Swing High/Low Detection
-swing_high = ta.pivothigh(high, swing_length, swing_length)
-swing_low  = ta.pivotlow(low, swing_length, swing_length)
+// --- Drawing cleanup arrays (for barstate.islast redraws) ---
+var array<line>  _lines  = array.new<line>()
+var array<box>   _boxes  = array.new<box>()
+var array<label> _labels = array.new<label>()
 
-// Track swing points
-var float last_swing_high = na
-var float last_swing_low  = na
-var int   last_sh_bar     = na
-var int   last_sl_bar     = na
-var float prev_swing_high = na
-var float prev_swing_low  = na
-var int   prev_sh_bar     = na
-var int   prev_sl_bar     = na
+// --- request.security at global scope (v6 requirement) ---
+prev_day_h = request.security(syminfo.tickerid, "D", high[1], lookahead=barmerge.lookahead_on)
+prev_day_l = request.security(syminfo.tickerid, "D", low[1],  lookahead=barmerge.lookahead_on)
 
-if not na(swing_high)
-    prev_swing_high := last_swing_high
-    prev_sh_bar     := last_sh_bar
-    last_swing_high := swing_high
-    last_sh_bar     := bar_index - swing_length
+// --- ta.sma for ATR smoothing at global scope ---
+atr_sma_20 = ta.sma(atr_val, 20)
 
-if not na(swing_low)
-    prev_swing_low := last_swing_low
-    prev_sl_bar    := last_sl_bar
-    last_swing_low := swing_low
-    last_sl_bar    := bar_index - swing_length
+// --- Day change detection at global scope ---
+new_day_flag = ta.change(time("D")) != 0
 
 // ══════════════════════════════════════════════════════════════════════════════
-// ░░░░░░░░░░░░░░░░░░░░░░░░░░ 4. STRUCTURE (BOS/CHoCH) ░░░░░░░░░░░░░░░░░░░░░
+// ░░░░░░░░░░░░░░░░░░░░░░░░░░ SWING DETECTION ░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
 // ══════════════════════════════════════════════════════════════════════════════
 
-var int trend_dir = 0  // 1 = bullish, -1 = bearish, 0 = neutral
-var float struct_high = na
-var float struct_low  = na
-var int struct_high_bar = na
-var int struct_low_bar  = na
+swing_hi = ta.pivothigh(high, swing_length, swing_length)
+swing_lo = ta.pivotlow(low,   swing_length, swing_length)
 
-// BOS: Break of Structure in trend direction
-// CHoCH: Change of Character (break against trend)
+var float last_sh       = na
+var float last_sl       = na
+var int   last_sh_bar   = na
+var int   last_sl_bar   = na
+var float prev_sh       = na
+var float prev_sl       = na
+var int   prev_sh_bar   = na
+var int   prev_sl_bar   = na
 
-bos_bull = false
-bos_bear = false
+// Third-level swings for multi-point trendlines
+var float prev2_sh      = na
+var float prev2_sl      = na
+var int   prev2_sh_bar  = na
+var int   prev2_sl_bar  = na
+
+if not na(swing_hi)
+    prev2_sh     := prev_sh
+    prev2_sh_bar := prev_sh_bar
+    prev_sh      := last_sh
+    prev_sh_bar  := last_sh_bar
+    last_sh      := swing_hi
+    last_sh_bar  := bar_index - swing_length
+
+if not na(swing_lo)
+    prev2_sl     := prev_sl
+    prev2_sl_bar := prev_sl_bar
+    prev_sl      := last_sl
+    prev_sl_bar  := last_sl_bar
+    last_sl      := swing_lo
+    last_sl_bar  := bar_index - swing_length
+
+// ══════════════════════════════════════════════════════════════════════════════
+// ░░░░░░░░░░░░░░░░░░░░ MODULE 4: MARKET STRUCTURE (BOS & CHoCH) ░░░░░░░░░░░░
+// ══════════════════════════════════════════════════════════════════════════════
+
+var int   trend_dir       = 0   // 1=bull, -1=bear
+var float struct_high     = na
+var float struct_low      = na
+var int   struct_high_bar = na
+var int   struct_low_bar  = na
+
+bos_bull   = false
+bos_bear   = false
 choch_bull = false
 choch_bear = false
 
 if show_structure
-    // Bullish break (close above last swing high)
-    if not na(last_swing_high) and close > last_swing_high and close[1] <= last_swing_high
-        if trend_dir == 1 or trend_dir == 0
+    // Bullish break above last swing high
+    if not na(last_sh) and close > last_sh and close[1] <= last_sh
+        if trend_dir >= 0
             bos_bull := true
-            trend_dir := 1
         else
             choch_bull := true
-            trend_dir := 1
-        struct_high := last_swing_high
+        trend_dir       := 1
+        struct_high     := last_sh
         struct_high_bar := last_sh_bar
 
-    // Bearish break (close below last swing low)
-    if not na(last_swing_low) and close < last_swing_low and close[1] >= last_swing_low
-        if trend_dir == -1 or trend_dir == 0
+    // Bearish break below last swing low
+    if not na(last_sl) and close < last_sl and close[1] >= last_sl
+        if trend_dir <= 0
             bos_bear := true
-            trend_dir := -1
         else
             choch_bear := true
-            trend_dir := -1
-        struct_low := last_swing_low
+        trend_dir      := -1
+        struct_low     := last_sl
         struct_low_bar := last_sl_bar
 
-// Draw BOS/CHoCH
+// Draw BOS
 if show_structure and bos_bull
-    line.new(last_sh_bar, last_swing_high, bar_index, last_swing_high, color=bos_color_bull, style=line.style_dashed, width=1)
-    label.new(bar_index, last_swing_high, "BOS ▲", style=label.style_label_down, color=color.new(bos_color_bull, 70), textcolor=bos_color_bull, size=lbl_size)
+    line.new(nz(last_sh_bar, bar_index), last_sh, bar_index, last_sh, color=bos_color_bull, style=line.style_dashed, width=1)
+    label.new(math.round(math.avg(nz(last_sh_bar, bar_index), bar_index)), last_sh, "BOS", style=label.style_label_down, color=color.new(bos_color_bull, 80), textcolor=bos_color_bull, size=lbl_sz)
 
 if show_structure and bos_bear
-    line.new(last_sl_bar, last_swing_low, bar_index, last_swing_low, color=bos_color_bear, style=line.style_dashed, width=1)
-    label.new(bar_index, last_swing_low, "BOS ▼", style=label.style_label_up, color=color.new(bos_color_bear, 70), textcolor=bos_color_bear, size=lbl_size)
+    line.new(nz(last_sl_bar, bar_index), last_sl, bar_index, last_sl, color=bos_color_bear, style=line.style_dashed, width=1)
+    label.new(math.round(math.avg(nz(last_sl_bar, bar_index), bar_index)), last_sl, "BOS", style=label.style_label_up, color=color.new(bos_color_bear, 80), textcolor=bos_color_bear, size=lbl_sz)
 
+// Draw CHoCH
 if show_structure and choch_bull
-    line.new(last_sh_bar, last_swing_high, bar_index, last_swing_high, color=choch_color_bull, style=line.style_dotted, width=2)
-    label.new(bar_index, last_swing_high, "CHoCH ▲", style=label.style_label_down, color=color.new(choch_color_bull, 70), textcolor=choch_color_bull, size=lbl_size)
+    line.new(nz(last_sh_bar, bar_index), last_sh, bar_index, last_sh, color=choch_color_bull, style=line.style_dotted, width=2)
+    label.new(math.round(math.avg(nz(last_sh_bar, bar_index), bar_index)), last_sh, "CHoCH", style=label.style_label_down, color=color.new(choch_color_bull, 80), textcolor=choch_color_bull, size=lbl_sz)
 
 if show_structure and choch_bear
-    line.new(last_sl_bar, last_swing_low, bar_index, last_swing_low, color=choch_color_bear, style=line.style_dotted, width=2)
-    label.new(bar_index, last_swing_low, "CHoCH ▼", style=label.style_label_up, color=color.new(choch_color_bear, 70), textcolor=choch_color_bear, size=lbl_size)
+    line.new(nz(last_sl_bar, bar_index), last_sl, bar_index, last_sl, color=choch_color_bear, style=line.style_dotted, width=2)
+    label.new(math.round(math.avg(nz(last_sl_bar, bar_index), bar_index)), last_sl, "CHoCH", style=label.style_label_up, color=color.new(choch_color_bear, 80), textcolor=choch_color_bear, size=lbl_sz)
 
 // ══════════════════════════════════════════════════════════════════════════════
-// ░░░░░░░░░░░░░░░░░░░░░░░░░░ 5. ORDER BLOCKS ░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
+// ░░░░░░░░░░░░░░░░░░░░ MODULE 7a: FAIR VALUE GAPS (FVG) ░░░░░░░░░░░░░░░░░░░░
 // ══════════════════════════════════════════════════════════════════════════════
 
-// Type for Order Block tracking
+type FVGap
+    float   top
+    float   bottom
+    int     start_bar
+    bool    is_bull
+    bool    is_filled
+
+var array<FVGap> fvg_arr = array.new<FVGap>()
+
+// Detect FVGs: 3-candle pattern where middle candle creates gap
+bull_fvg_cond = low > high[2] and close[1] > open[1]
+bear_fvg_cond = high < low[2] and close[1] < open[1]
+
+// Track newest FVG direction for sweep+reversal module
+var int   last_fvg_dir = 0
+var int   last_fvg_bar = 0
+
+if show_fvg or show_sweep_rev or show_confluence
+    if bull_fvg_cond
+        gap_sz = low - high[2]
+        if not fvg_filter_atr or gap_sz > atr_val * fvg_atr_mult
+            array.push(fvg_arr, FVGap.new(low, high[2], bar_index - 1, true, false))
+            last_fvg_dir := 1
+            last_fvg_bar := bar_index
+
+    if bear_fvg_cond
+        gap_sz = low[2] - high
+        if not fvg_filter_atr or gap_sz > atr_val * fvg_atr_mult
+            array.push(fvg_arr, FVGap.new(low[2], high, bar_index - 1, false, false))
+            last_fvg_dir := -1
+            last_fvg_bar := bar_index
+
+    // Check fill status
+    for i = array.size(fvg_arr) - 1 to 0
+        if i >= array.size(fvg_arr)
+            continue
+        fvg = array.get(fvg_arr, i)
+        if not fvg.is_filled
+            if fvg.is_bull and low <= fvg.bottom
+                fvg.is_filled := true
+            if not fvg.is_bull and high >= fvg.top
+                fvg.is_filled := true
+
+    // Trim excess
+    while array.size(fvg_arr) > fvg_max_display * 3
+        array.shift(fvg_arr)
+
+// ══════════════════════════════════════════════════════════════════════════════
+// ░░░░░░░░░░░░░░░░░░░░ MODULE 5: ORDER BLOCKS ░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
+// ══════════════════════════════════════════════════════════════════════════════
+
 type OrderBlock
-    float top
-    float bottom
-    int   start_bar
-    bool  is_bull
-    bool  is_mitigated
-    int   touch_count
+    float   top
+    float   bottom
+    int     start_bar
+    bool    is_bull
+    bool    is_mitigated
+    int     touch_count
 
-var array<OrderBlock> ob_array = array.new<OrderBlock>()
+var array<OrderBlock> ob_arr = array.new<OrderBlock>()
 
-// Detect bullish OB: last bearish candle before strong bullish move
-bull_ob_cond = close[1] < open[1] and close > open and (close - open) > atr_val * 1.0 and close > high[1]
-// Detect bearish OB: last bullish candle before strong bearish move
-bear_ob_cond = close[1] > open[1] and close < open and (open - close) > atr_val * 1.0 and close < low[1]
+// OB = last opposite candle before impulse creating BOS or FVG
+ob_impulse_bull = (close - open) > atr_val and close > high[1]
+ob_impulse_bear = (open - close) > atr_val and close < low[1]
+ob_bull_trigger = ob_impulse_bull and (bos_bull or bull_fvg_cond)
+ob_bear_trigger = ob_impulse_bear and (bos_bear or bear_fvg_cond)
 
-if show_orderblocks
-    if bull_ob_cond
-        ob = OrderBlock.new(high[1], low[1], bar_index - 1, true, false, 0)
-        array.push(ob_array, ob)
+// Fallback: strong impulse alone as OB source
+ob_bull_fallback = close[1] < open[1] and ob_impulse_bull
+ob_bear_fallback = close[1] > open[1] and ob_impulse_bear
 
-    if bear_ob_cond
-        ob = OrderBlock.new(high[1], low[1], bar_index - 1, false, false, 0)
-        array.push(ob_array, ob)
+if show_orderblocks or show_confluence
+    if ob_bull_trigger or ob_bull_fallback
+        array.push(ob_arr, OrderBlock.new(high[1], low[1], bar_index - 1, true, false, 0))
 
-    // Check mitigation and draw
-    if array.size(ob_array) > 0
-        for i = array.size(ob_array) - 1 to 0
-            if i >= array.size(ob_array)
-                continue
-            ob = array.get(ob_array, i)
-            if ob_mitigation_check and not ob.is_mitigated
-                if ob.is_bull and close < ob.bottom
-                    ob.is_mitigated := true
-                if not ob.is_bull and close > ob.top
-                    ob.is_mitigated := true
-            // Track touches
+    if ob_bear_trigger or ob_bear_fallback
+        array.push(ob_arr, OrderBlock.new(high[1], low[1], bar_index - 1, false, false, 0))
+
+    // Mitigation check: 50% penetration
+    for i = array.size(ob_arr) - 1 to 0
+        if i >= array.size(ob_arr)
+            continue
+        ob = array.get(ob_arr, i)
+        if not ob.is_mitigated
+            ob_mid = ob.bottom + (ob.top - ob.bottom) * (ob_mitigation_pct / 100.0)
+            if ob.is_bull and close < ob_mid
+                ob.is_mitigated := true
+            if not ob.is_bull and close > (ob.top - (ob.top - ob.bottom) * (ob_mitigation_pct / 100.0))
+                ob.is_mitigated := true
+            // Track touches (price enters zone but doesn't mitigate)
             if not ob.is_mitigated
                 if ob.is_bull and low <= ob.top and low >= ob.bottom
                     ob.touch_count += 1
                 if not ob.is_bull and high >= ob.bottom and high <= ob.top
                     ob.touch_count += 1
 
-    // Remove old mitigated or excess OBs
-    while array.size(ob_array) > ob_max_display * 2
-        array.shift(ob_array)
-
-// Draw Order Blocks
-if show_orderblocks and barstate.islast
-    for i = 0 to math.min(array.size(ob_array) - 1, ob_max_display - 1)
-        if i >= array.size(ob_array)
-            break
-        ob = array.get(ob_array, array.size(ob_array) - 1 - i)
-        if not ob.is_mitigated
-            ob_col = ob.is_bull ? ob_bull_color : ob_bear_color
-            box.new(ob.start_bar, ob.top, bar_index + 5, ob.bottom, border_color=ob_col, bgcolor=ob_col, border_width=1)
-            ob_txt = (ob.is_bull ? "Bull OB" : "Bear OB") + (ob.touch_count > 0 ? " (" + str.tostring(ob.touch_count) + "x)" : "")
-            label.new(ob.start_bar, ob.is_bull ? ob.bottom : ob.top, ob_txt, style=ob.is_bull ? label.style_label_up : label.style_label_down, color=color.new(color.black, 100), textcolor=ob.is_bull ? color.green : color.red, size=size.tiny)
+    // Trim
+    while array.size(ob_arr) > ob_max_display * 3
+        array.shift(ob_arr)
 
 // ══════════════════════════════════════════════════════════════════════════════
-// ░░░░░░░░░░░░░░░░░░░░░░░░░░ 3. SUPPLY/DEMAND ZONES ░░░░░░░░░░░░░░░░░░░░░░░
+// ░░░░░░░░░░░░░░░░░░░░ MODULE 3: SUPPLY / DEMAND ZONES ░░░░░░░░░░░░░░░░░░░░░
 // ══════════════════════════════════════════════════════════════════════════════
 
 type SDZone
-    float top
-    float bottom
-    int   start_bar
-    bool  is_demand
-    int   status  // 0=fresh, 1=tested, 2=broken
+    float   top
+    float   bottom
+    int     start_bar
+    bool    is_demand
+    int     status  // 0=fresh, 1=tested, 2=broken
 
-var array<SDZone> sd_array = array.new<SDZone>()
+var array<SDZone> sd_arr = array.new<SDZone>()
 
-// Impulse detection
 impulse_up   = (close - open) > atr_val * sd_impulse_mult and close > high[1]
 impulse_down = (open - close) > atr_val * sd_impulse_mult and close < low[1]
 
-if show_sd_zones
-    // Demand zone: base before impulse up
+if show_sd_zones or show_confluence
     if impulse_up
-        zone_top = math.max(open[1], close[1])
-        zone_bot = math.min(open[1], close[1])
-        if zone_top > zone_bot
-            sd = SDZone.new(zone_top, zone_bot, bar_index - 1, true, 0)
-            array.push(sd_array, sd)
+        zt = math.max(open[1], close[1])
+        zb = math.min(open[1], close[1])
+        if zt > zb
+            array.push(sd_arr, SDZone.new(zt, zb, bar_index - 1, true, 0))
 
-    // Supply zone: base before impulse down
     if impulse_down
-        zone_top = math.max(open[1], close[1])
-        zone_bot = math.min(open[1], close[1])
-        if zone_top > zone_bot
-            sd = SDZone.new(zone_top, zone_bot, bar_index - 1, false, 0)
-            array.push(sd_array, sd)
+        zt = math.max(open[1], close[1])
+        zb = math.min(open[1], close[1])
+        if zt > zb
+            array.push(sd_arr, SDZone.new(zt, zb, bar_index - 1, false, 0))
 
-    // Update zone status
-    if array.size(sd_array) > 0
-        for i = array.size(sd_array) - 1 to 0
-            if i >= array.size(sd_array)
-                continue
-            sd = array.get(sd_array, i)
-            if sd.status == 0  // fresh
-                if sd.is_demand and low <= sd.top and close > sd.bottom
-                    sd.status := 1  // tested
-                if not sd.is_demand and high >= sd.bottom and close < sd.top
-                    sd.status := 1  // tested
-            if sd.status <= 1  // fresh or tested
-                if sd.is_demand and close < sd.bottom
-                    sd.status := 2  // broken
-                if not sd.is_demand and close > sd.top
-                    sd.status := 2  // broken
+    // Status updates
+    for i = array.size(sd_arr) - 1 to 0
+        if i >= array.size(sd_arr)
+            continue
+        sd = array.get(sd_arr, i)
+        if sd.status == 0
+            if sd.is_demand and low <= sd.top and close > sd.bottom
+                sd.status := 1
+            if not sd.is_demand and high >= sd.bottom and close < sd.top
+                sd.status := 1
+        if sd.status <= 1
+            if sd.is_demand and close < sd.bottom
+                sd.status := 2
+            if not sd.is_demand and close > sd.top
+                sd.status := 2
 
-    while array.size(sd_array) > sd_max_zones * 3
-        array.shift(sd_array)
-
-// Draw S/D Zones
-if show_sd_zones and barstate.islast
-    drawn = 0
-    for i = array.size(sd_array) - 1 to 0
-        if drawn >= sd_max_zones
-            break
-        if i >= array.size(sd_array) or i < 0
-            break
-        sd = array.get(sd_array, i)
-        if sd.status < 2  // not broken
-            sd_col = color.new(color.white, 100)
-            if sd.is_demand
-                sd_col := sd.status == 0 ? sd_fresh_color_bull : sd_tested_color_bull
-            else
-                sd_col := sd.status == 0 ? sd_fresh_color_bear : sd_tested_color_bear
-            box.new(sd.start_bar, sd.top, bar_index + 5, sd.bottom, border_color=sd_col, bgcolor=sd_col, border_width=1, border_style=sd.status == 0 ? line.style_solid : line.style_dashed)
-            status_txt = sd.status == 0 ? "Fresh" : "Tested"
-            zone_txt = (sd.is_demand ? "Demand" : "Supply") + " (" + status_txt + ")"
-            label.new(sd.start_bar, sd.is_demand ? sd.bottom : sd.top, zone_txt, style=sd.is_demand ? label.style_label_up : label.style_label_down, color=color.new(color.black, 100), textcolor=sd.is_demand ? color.green : color.red, size=size.tiny)
-            drawn += 1
+    while array.size(sd_arr) > sd_max_zones * 3
+        array.shift(sd_arr)
 
 // ══════════════════════════════════════════════════════════════════════════════
-// ░░░░░░░░░░░░░░░░░░░░░░░░░░ 7. FAIR VALUE GAPS (FVG) ░░░░░░░░░░░░░░░░░░░░░
-// ══════════════════════════════════════════════════════════════════════════════
-
-type FVGap
-    float top
-    float bottom
-    int   start_bar
-    bool  is_bull
-    bool  is_filled
-
-var array<FVGap> fvg_array = array.new<FVGap>()
-
-// Bullish FVG: gap between candle 2 high and candle 0 low (current)
-bull_fvg = low > high[2] and close[1] > open[1]
-// Bearish FVG: gap between candle 0 high and candle 2 low
-bear_fvg = high < low[2] and close[1] < open[1]
-
-if show_fvg
-    if bull_fvg
-        gap_size = low - high[2]
-        if not fvg_filter_atr or gap_size > atr_val * fvg_atr_mult
-            fvg = FVGap.new(low, high[2], bar_index - 1, true, false)
-            array.push(fvg_array, fvg)
-
-    if bear_fvg
-        gap_size = low[2] - high
-        if not fvg_filter_atr or gap_size > atr_val * fvg_atr_mult
-            fvg = FVGap.new(low[2], high, bar_index - 1, false, false)
-            array.push(fvg_array, fvg)
-
-    // Check if FVG is filled
-    if array.size(fvg_array) > 0
-        for i = array.size(fvg_array) - 1 to 0
-            if i >= array.size(fvg_array)
-                continue
-            fvg = array.get(fvg_array, i)
-            if not fvg.is_filled
-                if fvg.is_bull and low <= fvg.bottom
-                    fvg.is_filled := true
-                if not fvg.is_bull and high >= fvg.top
-                    fvg.is_filled := true
-
-    while array.size(fvg_array) > fvg_max_display * 3
-        array.shift(fvg_array)
-
-// Draw FVGs
-if show_fvg and barstate.islast
-    drawn = 0
-    for i = array.size(fvg_array) - 1 to 0
-        if drawn >= fvg_max_display
-            break
-        if i >= array.size(fvg_array) or i < 0
-            break
-        fvg = array.get(fvg_array, i)
-        if not fvg.is_filled
-            fvg_col = fvg.is_bull ? fvg_bull_color : fvg_bear_color
-            box.new(fvg.start_bar, fvg.top, bar_index + 3, fvg.bottom, border_color=fvg_col, bgcolor=fvg_col, border_width=1)
-            label.new(fvg.start_bar, fvg.is_bull ? fvg.bottom : fvg.top, "FVG", style=fvg.is_bull ? label.style_label_up : label.style_label_down, color=color.new(color.black, 100), textcolor=fvg.is_bull ? color.blue : color.purple, size=size.tiny)
-            drawn += 1
-
-// ══════════════════════════════════════════════════════════════════════════════
-// ░░░░░░░░░░░░░░░░░░░░░░░░░░ 6. LIQUIDITY LEVELS ░░░░░░░░░░░░░░░░░░░░░░░░░░
+// ░░░░░░░░░░░░░░░░░░░░ MODULE 6: LIQUIDITY & SWEEPS ░░░░░░░░░░░░░░░░░░░░░░░░
 // ══════════════════════════════════════════════════════════════════════════════
 
 type LiqLevel
-    float price
-    int   bar_idx
-    bool  is_high
-    bool  is_swept
+    float   price
+    int     bar_idx
+    bool    is_high
+    bool    is_swept
+    bool    is_equal   // Equal highs/lows flag
+    string  lbl_text
 
-var array<LiqLevel> liq_array = array.new<LiqLevel>()
+var array<LiqLevel> liq_arr = array.new<LiqLevel>()
 
-if show_liquidity
-    // Add swing highs as liquidity above
-    if not na(swing_high)
-        liq = LiqLevel.new(swing_high, bar_index - swing_length, true, false)
-        array.push(liq_array, liq)
+// Sweep tracking for Module 8
+var bool sweep_bull_sig = false
+var bool sweep_bear_sig = false
+sweep_bull_sig := false
+sweep_bear_sig := false
 
-    // Add swing lows as liquidity below
-    if not na(swing_low)
-        liq = LiqLevel.new(swing_low, bar_index - swing_length, false, false)
-        array.push(liq_array, liq)
+if show_liquidity or show_sweep_rev or show_confluence
+    // Add swing highs/lows as liquidity
+    if not na(swing_hi)
+        array.push(liq_arr, LiqLevel.new(swing_hi, bar_index - swing_length, true, false, false, "$"))
 
-    // Check for sweeps
-    if array.size(liq_array) > 0
-        for i = array.size(liq_array) - 1 to 0
-            if i >= array.size(liq_array)
+    if not na(swing_lo)
+        array.push(liq_arr, LiqLevel.new(swing_lo, bar_index - swing_length, false, false, false, "$"))
+
+    // Detect Equal Highs / Equal Lows
+    if not na(swing_hi) and not na(prev_sh) and math.abs(swing_hi - prev_sh) < atr_val * liq_eq_tolerance
+        // Mark both as equal highs
+        for i = array.size(liq_arr) - 1 to math.max(0, array.size(liq_arr) - 5)
+            if i >= array.size(liq_arr) or i < 0
                 continue
-            liq = array.get(liq_array, i)
-            if not liq.is_swept
-                if liq.is_high and high > liq.price and close < liq.price
-                    liq.is_swept := true
-                if not liq.is_high and low < liq.price and close > liq.price
-                    liq.is_swept := true
+            lv = array.get(liq_arr, i)
+            if lv.is_high and not lv.is_swept and math.abs(lv.price - swing_hi) < atr_val * liq_eq_tolerance
+                lv.is_equal := true
+                lv.lbl_text := "EQH $"
 
-    while array.size(liq_array) > liq_lookback
-        array.shift(liq_array)
+    if not na(swing_lo) and not na(prev_sl) and math.abs(swing_lo - prev_sl) < atr_val * liq_eq_tolerance
+        for i = array.size(liq_arr) - 1 to math.max(0, array.size(liq_arr) - 5)
+            if i >= array.size(liq_arr) or i < 0
+                continue
+            lv = array.get(liq_arr, i)
+            if not lv.is_high and not lv.is_swept and math.abs(lv.price - swing_lo) < atr_val * liq_eq_tolerance
+                lv.is_equal := true
+                lv.lbl_text := "EQL $"
 
-// Draw Liquidity Levels
-if show_liquidity and barstate.islast
-    for i = 0 to math.min(array.size(liq_array) - 1, 20)
-        if i >= array.size(liq_array)
-            break
-        liq = array.get(liq_array, array.size(liq_array) - 1 - i)
-        if not liq.is_swept
-            liq_col = liq.is_high ? liq_color_high : liq_color_low
-            line.new(liq.bar_idx, liq.price, bar_index + 5, liq.price, color=liq_col, style=line.style_dotted, width=1)
-            label.new(bar_index + 5, liq.price, liq.is_high ? "LQ$▲" : "LQ$▼", style=label.style_label_left, color=color.new(color.black, 100), textcolor=color.new(#FFD600, 0), size=size.tiny)
+    // Previous day high/low as liquidity (using global-scope request.security)
+    if new_day_flag and not na(prev_day_h)
+        array.push(liq_arr, LiqLevel.new(prev_day_h, bar_index, true, false, false, "PDH $"))
+        array.push(liq_arr, LiqLevel.new(prev_day_l, bar_index, false, false, false, "PDL $"))
 
-// ══════════════════════════════════════════════════════════════════════════════
-// ░░░░░░░░░░░░░░░░░░░░░░░░░░ 8. LIQUIDITY SWEEP → REVERSAL ░░░░░░░░░░░░░░░░
-// ══════════════════════════════════════════════════════════════════════════════
-
-sweep_bull = false
-sweep_bear = false
-
-if show_sweep and array.size(liq_array) > 0
-    for i = array.size(liq_array) - 1 to math.max(0, array.size(liq_array) - 10)
-        if i >= array.size(liq_array) or i < 0
+    // Check sweeps (wick through level, close back inside)
+    for i = array.size(liq_arr) - 1 to 0
+        if i >= array.size(liq_arr)
             continue
-        liq = array.get(liq_array, i)
-        // Bullish sweep reversal: price sweeps below low then closes above
-        if not liq.is_high and not liq.is_swept
-            if low <= liq.price - atr_val * liq_sweep_pips * 0.1 and close > liq.price
-                sweep_bull := true
-                liq.is_swept := true
-        // Bearish sweep reversal: price sweeps above high then closes below
-        if liq.is_high and not liq.is_swept
-            if high >= liq.price + atr_val * liq_sweep_pips * 0.1 and close < liq.price
-                sweep_bear := true
-                liq.is_swept := true
+        lv = array.get(liq_arr, i)
+        if not lv.is_swept
+            if lv.is_high and high > lv.price and close < lv.price
+                lv.is_swept := true
+                sweep_bear_sig := true
+            if not lv.is_high and low < lv.price and close > lv.price
+                lv.is_swept := true
+                sweep_bull_sig := true
 
-if show_sweep and sweep_bull
-    label.new(bar_index, low, "SWEEP\n▲ REV", style=label.style_label_up, color=color.new(#00E676, 30), textcolor=color.white, size=size.small)
-
-if show_sweep and sweep_bear
-    label.new(bar_index, high, "SWEEP\n▼ REV", style=label.style_label_down, color=color.new(#FF5252, 30), textcolor=color.white, size=size.small)
+    // Trim to lookback limit
+    while array.size(liq_arr) > liq_lookback
+        array.shift(liq_arr)
 
 // ══════════════════════════════════════════════════════════════════════════════
-// ░░░░░░░░░░░░░░░░░░░░░░░░░░ 1. DIAGONAL TREND LINES ░░░░░░░░░░░░░░░░░░░░░░
+// ░░░░░░░░░░░░░░░░░░░░ MODULE 1: DIAGONAL TREND LINES ░░░░░░░░░░░░░░░░░░░░░░
 // ══════════════════════════════════════════════════════════════════════════════
 
-var line diag_bull_line = na
-var line diag_bear_line = na
-var float diag_bull_slope = na
-var float diag_bear_slope = na
-var float diag_bull_start_price = na
-var float diag_bear_start_price = na
-var int diag_bull_start_bar = na
-var int diag_bear_start_bar = na
+var line  diag_bull_line       = na
+var line  diag_bear_line       = na
+var float diag_bull_slope      = na
+var float diag_bear_slope      = na
+var float diag_bull_start_p    = na
+var float diag_bear_start_p    = na
+var int   diag_bull_start_bar  = na
+var int   diag_bear_start_bar  = na
 
 if show_diagonal
-    // Bullish trendline: connect two recent swing lows
-    if not na(swing_low) and not na(prev_swing_low) and not na(last_sl_bar) and not na(prev_sl_bar)
-        if last_swing_low > prev_swing_low and last_sl_bar > prev_sl_bar
+    // Bullish trendline: two ascending swing lows
+    if not na(swing_lo) and not na(prev_sl) and not na(last_sl_bar) and not na(prev_sl_bar)
+        if last_sl > prev_sl and last_sl_bar > prev_sl_bar
             if not na(diag_bull_line)
                 line.delete(diag_bull_line)
             ext = diag_extend ? extend.right : extend.none
-            diag_bull_line := line.new(prev_sl_bar, prev_swing_low, last_sl_bar, last_swing_low, color=diag_bull_color, width=2, extend=ext)
-            diag_bull_slope := (last_swing_low - prev_swing_low) / math.max(1, last_sl_bar - prev_sl_bar)
-            diag_bull_start_price := prev_swing_low
+            diag_bull_line      := line.new(prev_sl_bar, prev_sl, last_sl_bar, last_sl, color=diag_bull_color, width=2, extend=ext)
+            diag_bull_slope     := (last_sl - prev_sl) / math.max(1, last_sl_bar - prev_sl_bar)
+            diag_bull_start_p   := prev_sl
             diag_bull_start_bar := prev_sl_bar
 
-    // Bearish trendline: connect two recent swing highs
-    if not na(swing_high) and not na(prev_swing_high) and not na(last_sh_bar) and not na(prev_sh_bar)
-        if last_swing_high < prev_swing_high and last_sh_bar > prev_sh_bar
+    // Bearish trendline: two descending swing highs
+    if not na(swing_hi) and not na(prev_sh) and not na(last_sh_bar) and not na(prev_sh_bar)
+        if last_sh < prev_sh and last_sh_bar > prev_sh_bar
             if not na(diag_bear_line)
                 line.delete(diag_bear_line)
             ext = diag_extend ? extend.right : extend.none
-            diag_bear_line := line.new(prev_sh_bar, prev_swing_high, last_sh_bar, last_swing_high, color=diag_bear_color, width=2, extend=ext)
-            diag_bear_slope := (last_swing_high - prev_swing_high) / math.max(1, last_sh_bar - prev_sh_bar)
-            diag_bear_start_price := prev_swing_high
+            diag_bear_line      := line.new(prev_sh_bar, prev_sh, last_sh_bar, last_sh, color=diag_bear_color, width=2, extend=ext)
+            diag_bear_slope     := (last_sh - prev_sh) / math.max(1, last_sh_bar - prev_sh_bar)
+            diag_bear_start_p   := prev_sh
             diag_bear_start_bar := prev_sh_bar
 
-// Diagonal break signals
+// Diagonal break detection
+var bool diag_bull_break = false
+var bool diag_bear_break = false
+diag_bull_break := false
+diag_bear_break := false
+
 if show_diagonal and diag_break_signal
-    // Bull trendline break (bearish signal)
-    if not na(diag_bull_slope) and not na(diag_bull_start_bar) and not na(diag_bull_start_price)
-        tl_price_at_bar = diag_bull_start_price + diag_bull_slope * (bar_index - diag_bull_start_bar)
-        if close < tl_price_at_bar and close[1] >= (diag_bull_start_price + diag_bull_slope * (bar_index - 1 - diag_bull_start_bar))
-            label.new(bar_index, low, "TL Break ▼", style=label.style_label_up, color=color.new(#FF5252, 50), textcolor=#FF5252, size=size.tiny)
+    // Break of bullish trendline (bearish)
+    if not na(diag_bull_slope) and not na(diag_bull_start_bar) and not na(diag_bull_start_p)
+        tl_now  = diag_bull_start_p + diag_bull_slope * (bar_index     - diag_bull_start_bar)
+        tl_prev = diag_bull_start_p + diag_bull_slope * (bar_index - 1 - diag_bull_start_bar)
+        if close < tl_now and close[1] >= tl_prev
+            diag_bear_break := true
+            label.new(bar_index, low, "TL Break", style=label.style_label_up, color=color.new(#FF5252, 50), textcolor=#FF5252, size=size.tiny)
             diag_bull_slope := na
 
-    // Bear trendline break (bullish signal)
-    if not na(diag_bear_slope) and not na(diag_bear_start_bar) and not na(diag_bear_start_price)
-        tl_price_at_bar = diag_bear_start_price + diag_bear_slope * (bar_index - diag_bear_start_bar)
-        if close > tl_price_at_bar and close[1] <= (diag_bear_start_price + diag_bear_slope * (bar_index - 1 - diag_bear_start_bar))
-            label.new(bar_index, high, "TL Break ▲", style=label.style_label_down, color=color.new(#00E676, 50), textcolor=#00E676, size=size.tiny)
+    // Break of bearish trendline (bullish)
+    if not na(diag_bear_slope) and not na(diag_bear_start_bar) and not na(diag_bear_start_p)
+        tl_now  = diag_bear_start_p + diag_bear_slope * (bar_index     - diag_bear_start_bar)
+        tl_prev = diag_bear_start_p + diag_bear_slope * (bar_index - 1 - diag_bear_start_bar)
+        if close > tl_now and close[1] <= tl_prev
+            diag_bull_break := true
+            label.new(bar_index, high, "TL Break", style=label.style_label_down, color=color.new(#00E676, 50), textcolor=#00E676, size=size.tiny)
             diag_bear_slope := na
 
 // ══════════════════════════════════════════════════════════════════════════════
-// ░░░░░░░░░░░░░░░░░░░░░░░░░░ 9. PREMIUM / DISCOUNT ░░░░░░░░░░░░░░░░░░░░░░░░
+// ░░░░░░░░░░░░░░ MODULE 8: SWEEP + REVERSAL CONFIRMATION (TRIGGER) ░░░░░░░░░░
 // ══════════════════════════════════════════════════════════════════════════════
 
-var float pd_range_high = na
-var float pd_range_low  = na
+// Trigger: Liquidity Sweep (6) + CHoCH (4) or opposite FVG (7) within same/next bar
+sweep_rev_bull = false
+sweep_rev_bear = false
 
-if show_premium_disc
-    // Use recent significant swing high/low for range
-    if not na(last_swing_high)
-        pd_range_high := last_swing_high
-    if not na(last_swing_low)
-        pd_range_low := last_swing_low
+if show_sweep_rev
+    // Bullish: sweep below low + (CHoCH bull OR bullish FVG)
+    bull_confirm = choch_bull or (last_fvg_dir == 1 and last_fvg_bar >= bar_index - 1)
+    if sweep_bull_sig and bull_confirm
+        sweep_rev_bull := true
 
-pd_mid = na(pd_range_high) or na(pd_range_low) ? na : (pd_range_high + pd_range_low) / 2.0
-pd_is_premium = not na(pd_mid) and close > pd_mid
-pd_is_discount = not na(pd_mid) and close < pd_mid
+    // Bearish: sweep above high + (CHoCH bear OR bearish FVG)
+    bear_confirm = choch_bear or (last_fvg_dir == -1 and last_fvg_bar >= bar_index - 1)
+    if sweep_bear_sig and bear_confirm
+        sweep_rev_bear := true
 
-// Background coloring
-bgcolor(show_premium_disc and pd_is_premium ? pd_premium_color : na, title="Premium Zone BG")
-bgcolor(show_premium_disc and pd_is_discount ? pd_discount_color : na, title="Discount Zone BG")
+if show_sweep_rev and sweep_rev_bull
+    label.new(bar_index, low - atr_val * 0.3, "SWEEP+REV", style=label.style_label_up, color=color.new(#00E676, 10), textcolor=color.white, size=size.normal)
 
-// Equilibrium line
-if show_premium_disc and barstate.islast and not na(pd_mid)
-    line.new(bar_index - 50, pd_mid, bar_index + 5, pd_mid, color=pd_eq_color, style=line.style_dashed, width=1)
-    label.new(bar_index + 5, pd_mid, "EQ 50%", style=label.style_label_left, color=color.new(color.black, 100), textcolor=color.gray, size=size.tiny)
-
-// Premium/Discount labels on last bar
-if show_premium_disc and barstate.islast and not na(pd_range_high) and not na(pd_range_low)
-    fib_level = pd_range_high != pd_range_low ? (close - pd_range_low) / (pd_range_high - pd_range_low) : 0.5
-    zone_txt = fib_level > 0.5 ? "PREMIUM (" + str.tostring(fib_level * 100, "#.0") + "%)" : "DISCOUNT (" + str.tostring(fib_level * 100, "#.0") + "%)"
-    zone_col = fib_level > 0.5 ? color.red : color.green
-    label.new(bar_index + 8, close, zone_txt, style=label.style_label_left, color=color.new(color.black, 100), textcolor=zone_col, size=size.small)
+if show_sweep_rev and sweep_rev_bear
+    label.new(bar_index, high + atr_val * 0.3, "SWEEP+REV", style=label.style_label_down, color=color.new(#FF5252, 10), textcolor=color.white, size=size.normal)
 
 // ══════════════════════════════════════════════════════════════════════════════
-// ░░░░░░░░░░░░░░░░░░░░░░░░░░ 12. OTE (OPTIMAL TRADE ENTRY) ░░░░░░░░░░░░░░░░
+// ░░░░░░░░░░░░░░░░░░░░ MODULE 9: PREMIUM / DISCOUNT ░░░░░░░░░░░░░░░░░░░░░░░░
 // ══════════════════════════════════════════════════════════════════════════════
 
-if show_ote and barstate.islast and not na(pd_range_high) and not na(pd_range_low)
-    range_size = pd_range_high - pd_range_low
-    if range_size > 0
-        // Bullish OTE (discount zone fib retracement)
-        if trend_dir == 1
-            ote_top = pd_range_high - range_size * ote_fib_start
-            ote_bot = pd_range_high - range_size * ote_fib_end
-            box.new(bar_index - 30, ote_top, bar_index + 5, ote_bot, border_color=ote_bull_color, bgcolor=ote_bull_color, border_width=1, border_style=line.style_dashed)
-            label.new(bar_index + 5, (ote_top + ote_bot) / 2, "OTE Buy", style=label.style_label_left, color=color.new(color.black, 100), textcolor=#00BCD4, size=size.tiny)
+var float pd_high = na
+var float pd_low  = na
 
-        // Bearish OTE (premium zone fib retracement)
-        if trend_dir == -1
-            ote_top = pd_range_low + range_size * ote_fib_end
-            ote_bot = pd_range_low + range_size * ote_fib_start
-            box.new(bar_index - 30, ote_top, bar_index + 5, ote_bot, border_color=ote_bear_color, bgcolor=ote_bear_color, border_width=1, border_style=line.style_dashed)
-            label.new(bar_index + 5, (ote_top + ote_bot) / 2, "OTE Sell", style=label.style_label_left, color=color.new(color.black, 100), textcolor=#FF9800, size=size.tiny)
+if show_premium_disc or show_ote or show_confluence
+    if not na(last_sh)
+        pd_high := last_sh
+    if not na(last_sl)
+        pd_low := last_sl
 
-// ══════════════════════════════════════════════════════════════════════════════
-// ░░░░░░░░░░░░░░░░░░░░░░░░░░ 13. MITIGATION LEVELS ░░░░░░░░░░░░░░░░░░░░░░░░
-// ══════════════════════════════════════════════════════════════════════════════
+pd_mid         = na(pd_high) or na(pd_low) ? na : (pd_high + pd_low) / 2.0
+pd_is_premium  = not na(pd_mid) and close > pd_mid
+pd_is_discount = not na(pd_mid) and close <= pd_mid
 
-type MitigationLevel
-    float price
-    int   bar_idx
-    bool  is_bull
-    bool  is_mitigated
-
-var array<MitigationLevel> mit_array = array.new<MitigationLevel>()
-
-if show_mitigation
-    // Bullish mitigation: bearish OB that gets revisited
-    if bos_bull and not na(struct_low)
-        mit = MitigationLevel.new(struct_low, struct_low_bar, true, false)
-        array.push(mit_array, mit)
-
-    if bos_bear and not na(struct_high)
-        mit = MitigationLevel.new(struct_high, struct_high_bar, false, false)
-        array.push(mit_array, mit)
-
-    // Check mitigation
-    if array.size(mit_array) > 0
-        for i = array.size(mit_array) - 1 to 0
-            if i >= array.size(mit_array)
-                continue
-            mit = array.get(mit_array, i)
-            if not mit.is_mitigated
-                if mit.is_bull and low <= mit.price
-                    mit.is_mitigated := true
-                if not mit.is_bull and high >= mit.price
-                    mit.is_mitigated := true
-
-    while array.size(mit_array) > 20
-        array.shift(mit_array)
-
-// Draw Mitigation Levels
-if show_mitigation and barstate.islast
-    for i = 0 to math.min(array.size(mit_array) - 1, 10)
-        if i >= array.size(mit_array)
-            break
-        mit = array.get(mit_array, array.size(mit_array) - 1 - i)
-        if not mit.is_mitigated
-            mit_col = mit.is_bull ? color.new(#00BCD4, 50) : color.new(#FF9800, 50)
-            line.new(mit.bar_idx, mit.price, bar_index + 3, mit.price, color=mit_col, style=line.style_arrow_right, width=1)
-            label.new(bar_index + 3, mit.price, "MIT", style=label.style_label_left, color=color.new(color.black, 100), textcolor=mit.is_bull ? #00BCD4 : #FF9800, size=size.tiny)
+// Background coloring (user toggle)
+bgcolor(show_premium_disc and pd_show_bg and pd_is_premium  ? pd_premium_color  : na, title="Premium BG")
+bgcolor(show_premium_disc and pd_show_bg and pd_is_discount ? pd_discount_color : na, title="Discount BG")
 
 // ══════════════════════════════════════════════════════════════════════════════
-// ░░░░░░░░░░░░░░░░░░░░░░░░░░ 10. MARKET PHASE DETECTOR ░░░░░░░░░░░░░░░░░░░░
+// ░░░░░░░░░░░░░░░░░░░░ MODULE 11: VOLUME CLIMAX & EXHAUSTION ░░░░░░░░░░░░░░░
 // ══════════════════════════════════════════════════════════════════════════════
 
-// Phase detection logic
-highest_high = ta.highest(high, phase_lookback)
-lowest_low   = ta.lowest(low, phase_lookback)
-range_size   = highest_high - lowest_low
-adr          = ta.atr(phase_adr_period)
+vol_sma_val    = ta.sma(volume, vol_sma_len)
+vol_is_climax  = volume > vol_sma_val * vol_climax_mult
 
-// Range detection: price contained within narrow range
-is_ranging = range_size < adr * 5
+body_sz    = math.abs(close - open)
+total_rng  = high - low
+small_body = total_rng > 0 ? body_sz / total_rng < 0.3 : false
+vol_is_exhaust = volume > vol_sma_val * vol_climax_mult * 1.25 and small_body
 
-// Trend detection
-ema_fast = ta.ema(close, 9)
-ema_slow = ta.ema(close, 21)
-is_trending_up   = ema_fast > ema_slow and close > ema_slow
-is_trending_down = ema_fast < ema_slow and close < ema_slow
+// Volume divergence
+vol_div_bear = not na(swing_hi) and not na(prev_sh) and swing_hi > prev_sh and volume < vol_sma_val * 0.8
+vol_div_bull = not na(swing_lo) and not na(prev_sl) and swing_lo < prev_sl and volume < vol_sma_val * 0.8
 
-// Volume analysis for phase
-vol_sma_phase = ta.sma(volume, phase_lookback)
-vol_increasing = volume > vol_sma_phase * 1.3
-vol_decreasing = volume < vol_sma_phase * 0.7
+if show_volume_climax
+    if vol_is_exhaust
+        label.new(bar_index, high + atr_val * 0.1, "X", style=label.style_label_down, color=color.new(vol_exhaust_color, 30), textcolor=vol_exhaust_color, size=size.tiny, tooltip="Volume Exhaustion")
+    else if vol_is_climax
+        label.new(bar_index, low - atr_val * 0.1, "V!", style=label.style_label_up, color=color.new(vol_climax_color, 50), textcolor=vol_climax_color, size=size.tiny, tooltip="Volume Climax")
 
-// Phase determination
+    if vol_div_bear
+        label.new(bar_index - swing_length, swing_hi, "VD", style=label.style_label_down, color=color.new(#E040FB, 60), textcolor=#E040FB, size=size.tiny, tooltip="Bearish Volume Divergence")
+
+    if vol_div_bull
+        label.new(bar_index - swing_length, swing_lo, "VD", style=label.style_label_up, color=color.new(#00BCD4, 60), textcolor=#00BCD4, size=size.tiny, tooltip="Bullish Volume Divergence")
+
+// ══════════════════════════════════════════════════════════════════════════════
+// ░░░░░░░░░░░░░░░░░░░░ MODULE 10: MARKET PHASE DETECTOR ░░░░░░░░░░░░░░░░░░░░
+// ══════════════════════════════════════════════════════════════════════════════
+
+highest_h  = ta.highest(high, phase_lookback)
+lowest_l   = ta.lowest(low,   phase_lookback)
+range_sz   = highest_h - lowest_l
+adr_val    = ta.atr(phase_adr_period)
+
+is_ranging     = range_sz < adr_val * 5
+ema_fast       = ta.ema(close, 9)
+ema_slow       = ta.ema(close, 21)
+is_trend_up    = ema_fast > ema_slow and close > ema_slow
+is_trend_down  = ema_fast < ema_slow and close < ema_slow
+
+vol_sma_phase  = ta.sma(volume, phase_lookback)
+vol_inc        = volume > vol_sma_phase * 1.3
+vol_dec        = volume < vol_sma_phase * 0.7
+
 var string market_phase = "Consolidation"
 
 if show_market_phase
-    if is_ranging and vol_decreasing
+    if is_ranging and vol_dec
         market_phase := "Accumulation"
-    else if is_ranging and vol_increasing
+    else if is_ranging and vol_inc
         market_phase := "Distribution"
-    else if not is_ranging and vol_increasing and (is_trending_up or is_trending_down)
-        market_phase := "Manipulation"
-    else if is_trending_up
-        market_phase := "Trending ▲"
-    else if is_trending_down
-        market_phase := "Trending ▼"
+    else if not is_ranging and (is_trend_up or is_trend_down) and vol_inc
+        market_phase := "Expansion"
+    else if is_trend_up
+        market_phase := "Trending Up"
+    else if is_trend_down
+        market_phase := "Trending Down"
     else if is_ranging
         market_phase := "Consolidation"
     else
         market_phase := "Transition"
 
-// Phase table
-if show_market_phase and barstate.islast
-    phase_tbl_pos = switch phase_label_pos
+// ══════════════════════════════════════════════════════════════════════════════
+// ░░░░░░░░░░░░░░░░░░░░ MODULE 2: CONFLUENCE ENGINE ░░░░░░░░░░░░░░░░░░░░░░░░░
+// ══════════════════════════════════════════════════════════════════════════════
+
+conf_score = 0
+conf_range = nz(atr_val) * conf_zone_atr_mult
+
+if show_confluence
+    // Factor 1: Near active Order Block
+    if array.size(ob_arr) > 0
+        for i = math.max(0, array.size(ob_arr) - 10) to array.size(ob_arr) - 1
+            if i >= array.size(ob_arr)
+                break
+            ob = array.get(ob_arr, i)
+            if not ob.is_mitigated
+                if close >= ob.bottom - conf_range and close <= ob.top + conf_range
+                    conf_score += 1
+                    break  // count once
+
+    // Factor 2: Near active S/D Zone
+    if array.size(sd_arr) > 0
+        for i = math.max(0, array.size(sd_arr) - 10) to array.size(sd_arr) - 1
+            if i >= array.size(sd_arr)
+                break
+            sd = array.get(sd_arr, i)
+            if sd.status < 2
+                if close >= sd.bottom - conf_range and close <= sd.top + conf_range
+                    conf_score += 1
+                    break
+
+    // Factor 3: Near unfilled FVG
+    if array.size(fvg_arr) > 0
+        for i = math.max(0, array.size(fvg_arr) - 10) to array.size(fvg_arr) - 1
+            if i >= array.size(fvg_arr)
+                break
+            fvg = array.get(fvg_arr, i)
+            if not fvg.is_filled
+                if close >= fvg.bottom - conf_range and close <= fvg.top + conf_range
+                    conf_score += 1
+                    break
+
+    // Factor 4: Near liquidity level
+    if array.size(liq_arr) > 0
+        for i = math.max(0, array.size(liq_arr) - 10) to array.size(liq_arr) - 1
+            if i >= array.size(liq_arr)
+                break
+            lv = array.get(liq_arr, i)
+            if not lv.is_swept
+                if math.abs(close - lv.price) <= conf_range
+                    conf_score += 1
+                    break
+
+    // Factor 5: Near diagonal trendline
+    if not na(diag_bull_slope) and not na(diag_bull_start_bar) and not na(diag_bull_start_p)
+        tl_p = diag_bull_start_p + diag_bull_slope * (bar_index - diag_bull_start_bar)
+        if math.abs(close - tl_p) <= conf_range
+            conf_score += 1
+
+    if not na(diag_bear_slope) and not na(diag_bear_start_bar) and not na(diag_bear_start_p)
+        tl_p = diag_bear_start_p + diag_bear_slope * (bar_index - diag_bear_start_bar)
+        if math.abs(close - tl_p) <= conf_range
+            conf_score += 1
+
+    // Factor 6: Premium/Discount alignment with trend
+    if pd_is_discount and trend_dir == 1
+        conf_score += 1
+    if pd_is_premium and trend_dir == -1
+        conf_score += 1
+
+    // Factor 7: In OTE zone
+    if show_ote and not na(pd_high) and not na(pd_low) and pd_high > pd_low
+        r = pd_high - pd_low
+        fib_pos = (close - pd_low) / r
+        if trend_dir == 1 and fib_pos >= (1.0 - ote_fib_end) and fib_pos <= (1.0 - ote_fib_start)
+            conf_score += 1
+        if trend_dir == -1 and fib_pos >= ote_fib_start and fib_pos <= ote_fib_end
+            conf_score += 1
+
+// Confluence highlight (background)
+conf_bg_col = conf_score >= 5 ? color.new(conf_strong_color, 70) : conf_score >= 3 ? color.new(conf_strong_color, 82) : conf_score >= conf_min_factors ? color.new(#9E9E9E, 88) : na
+bgcolor(show_confluence and conf_score >= conf_min_factors ? conf_bg_col : na, title="Confluence Zone")
+
+// ══════════════════════════════════════════════════════════════════════════════
+// ░░░░░░░░░░░░░░░░░░░░ BARSTATE.ISLAST — DRAW ALL ZONES ░░░░░░░░░░░░░░░░░░░░
+// ══════════════════════════════════════════════════════════════════════════════
+
+if barstate.islast
+    // Cleanup previous barstate.islast drawings
+    for _i = 0 to array.size(_lines) - 1
+        if _i < array.size(_lines)
+            line.delete(array.get(_lines, _i))
+    array.clear(_lines)
+    for _i = 0 to array.size(_boxes) - 1
+        if _i < array.size(_boxes)
+            box.delete(array.get(_boxes, _i))
+    array.clear(_boxes)
+    for _i = 0 to array.size(_labels) - 1
+        if _i < array.size(_labels)
+            label.delete(array.get(_labels, _i))
+    array.clear(_labels)
+
+    // ──── Draw Order Blocks ────
+    if show_orderblocks
+        drawn_ob = 0
+        for i = array.size(ob_arr) - 1 to 0
+            if drawn_ob >= ob_max_display or i < 0 or i >= array.size(ob_arr)
+                break
+            ob = array.get(ob_arr, i)
+            if not ob.is_mitigated
+                ob_col = ob.is_bull ? ob_bull_color : ob_bear_color
+                array.push(_boxes, box.new(ob.start_bar, ob.top, bar_index + 5, ob.bottom, border_color=ob_col, bgcolor=ob_col, border_width=1))
+                txt = (ob.is_bull ? "Bull OB" : "Bear OB") + (ob.touch_count > 0 ? " (" + str.tostring(ob.touch_count) + "x)" : "")
+                array.push(_labels, label.new(ob.start_bar, ob.is_bull ? ob.bottom : ob.top, txt, style=ob.is_bull ? label.style_label_up : label.style_label_down, color=color.new(color.black, 100), textcolor=ob.is_bull ? color.green : color.red, size=size.tiny))
+                drawn_ob += 1
+
+    // ──── Draw Supply / Demand Zones ────
+    if show_sd_zones
+        drawn_sd = 0
+        for i = array.size(sd_arr) - 1 to 0
+            if drawn_sd >= sd_max_zones or i < 0 or i >= array.size(sd_arr)
+                break
+            sd = array.get(sd_arr, i)
+            if sd.status < 2
+                sd_col = sd.is_demand ? (sd.status == 0 ? sd_fresh_color_bull : sd_tested_color_bull) : (sd.status == 0 ? sd_fresh_color_bear : sd_tested_color_bear)
+                bdr_style = sd.status == 0 ? line.style_solid : line.style_dashed
+                array.push(_boxes, box.new(sd.start_bar, sd.top, bar_index + 5, sd.bottom, border_color=sd_col, bgcolor=sd_col, border_width=1, border_style=bdr_style))
+                stxt = (sd.is_demand ? "Demand" : "Supply") + " (" + (sd.status == 0 ? "Fresh" : "Tested") + ")"
+                array.push(_labels, label.new(sd.start_bar, sd.is_demand ? sd.bottom : sd.top, stxt, style=sd.is_demand ? label.style_label_up : label.style_label_down, color=color.new(color.black, 100), textcolor=sd.is_demand ? color.green : color.red, size=size.tiny))
+                drawn_sd += 1
+
+    // ──── Draw FVGs ────
+    if show_fvg
+        drawn_fvg = 0
+        for i = array.size(fvg_arr) - 1 to 0
+            if drawn_fvg >= fvg_max_display or i < 0 or i >= array.size(fvg_arr)
+                break
+            fvg = array.get(fvg_arr, i)
+            if not fvg.is_filled
+                fvg_col = fvg.is_bull ? fvg_bull_color : fvg_bear_color
+                array.push(_boxes, box.new(fvg.start_bar, fvg.top, bar_index + 3, fvg.bottom, border_color=fvg_col, bgcolor=fvg_col, border_width=1))
+                array.push(_labels, label.new(fvg.start_bar, fvg.is_bull ? fvg.bottom : fvg.top, "FVG", style=fvg.is_bull ? label.style_label_up : label.style_label_down, color=color.new(color.black, 100), textcolor=fvg.is_bull ? color.blue : color.purple, size=size.tiny))
+                drawn_fvg += 1
+
+    // ──── Draw Liquidity Levels ────
+    if show_liquidity
+        drawn_liq = 0
+        for i = array.size(liq_arr) - 1 to 0
+            if drawn_liq >= liq_max_display or i < 0 or i >= array.size(liq_arr)
+                break
+            lv = array.get(liq_arr, i)
+            if not lv.is_swept
+                lc = lv.is_equal ? color.new(#FF6D00, 20) : liq_color
+                array.push(_lines, line.new(lv.bar_idx, lv.price, bar_index + 5, lv.price, color=lc, style=line.style_dotted, width=lv.is_equal ? 2 : 1))
+                array.push(_labels, label.new(bar_index + 5, lv.price, lv.lbl_text, style=label.style_label_left, color=color.new(color.black, 100), textcolor=lv.is_equal ? #FF6D00 : #FFD600, size=size.tiny))
+                drawn_liq += 1
+
+    // ──── Draw Premium / Discount ────
+    if show_premium_disc and not na(pd_mid)
+        array.push(_lines, line.new(bar_index - 50, pd_mid, bar_index + 5, pd_mid, color=color.new(#9E9E9E, 60), style=line.style_dashed, width=1))
+        array.push(_labels, label.new(bar_index + 6, pd_mid, "EQ 50%", style=label.style_label_left, color=color.new(color.black, 100), textcolor=color.gray, size=size.tiny))
+
+        if not na(pd_high) and not na(pd_low) and pd_high > pd_low
+            fib_lvl = (close - pd_low) / (pd_high - pd_low)
+            z_txt = fib_lvl > 0.5 ? "PREMIUM (" + str.tostring(fib_lvl * 100, "#.0") + "%)" : "DISCOUNT (" + str.tostring(fib_lvl * 100, "#.0") + "%)"
+            z_col = fib_lvl > 0.5 ? color.red : color.green
+            array.push(_labels, label.new(bar_index + 8, close, z_txt, style=label.style_label_left, color=color.new(color.black, 100), textcolor=z_col, size=size.small))
+
+    // ──── Draw OTE Zones ────
+    if show_ote and not na(pd_high) and not na(pd_low) and pd_high > pd_low
+        r_sz = pd_high - pd_low
+        if trend_dir == 1
+            ote_t = pd_high - r_sz * ote_fib_start
+            ote_b = pd_high - r_sz * ote_fib_end
+            array.push(_boxes, box.new(bar_index - 30, ote_t, bar_index + 5, ote_b, border_color=ote_bull_color, bgcolor=ote_bull_color, border_width=1, border_style=line.style_dashed))
+            array.push(_labels, label.new(bar_index + 5, (ote_t + ote_b) / 2, "OTE Buy\n" + str.tostring(ote_fib_start, "#.###") + "-" + str.tostring(ote_fib_end, "#.###"), style=label.style_label_left, color=color.new(color.black, 100), textcolor=#00BCD4, size=size.tiny))
+        if trend_dir == -1
+            ote_t = pd_low + r_sz * ote_fib_end
+            ote_b = pd_low + r_sz * ote_fib_start
+            array.push(_boxes, box.new(bar_index - 30, ote_t, bar_index + 5, ote_b, border_color=ote_bear_color, bgcolor=ote_bear_color, border_width=1, border_style=line.style_dashed))
+            array.push(_labels, label.new(bar_index + 5, (ote_t + ote_b) / 2, "OTE Sell\n" + str.tostring(ote_fib_start, "#.###") + "-" + str.tostring(ote_fib_end, "#.###"), style=label.style_label_left, color=color.new(color.black, 100), textcolor=#FF9800, size=size.tiny))
+
+    // ──── Draw Confluence Label ────
+    if show_confluence and conf_score >= conf_min_factors
+        c_txt = "CONFLUENCE: " + str.tostring(conf_score) + " factors"
+        c_col = conf_score >= 5 ? #FFD600 : conf_score >= 3 ? #FF9800 : #9E9E9E
+        array.push(_labels, label.new(bar_index, high + atr_val * 0.5, c_txt, style=label.style_label_down, color=color.new(c_col, 20), textcolor=color.white, size=size.small))
+
+// ══════════════════════════════════════════════════════════════════════════════
+// ░░░░░░░░░░░░░░░░░░░░ MARKET PHASE TABLE ░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
+// ══════════════════════════════════════════════════════════════════════════════
+
+var table phase_tbl = na
+
+if show_market_phase
+    phase_pos = switch phase_tbl_pos
         "Top Right"    => position.top_right
         "Top Left"     => position.top_left
         "Bottom Right" => position.bottom_right
         "Bottom Left"  => position.bottom_left
         => position.top_right
 
-    var table phase_table = table.new(phase_tbl_pos, 2, 4, bgcolor=color.new(#1E1E1E, 10), border_width=1, border_color=color.new(color.gray, 50))
+    if na(phase_tbl)
+        phase_tbl := table.new(phase_pos, 2, 5, bgcolor=color.new(#1E1E1E, 10), border_width=1, border_color=color.new(color.gray, 50))
 
     phase_col = switch market_phase
         "Accumulation"  => color.new(#00BCD4, 0)
         "Distribution"  => color.new(#FF9800, 0)
-        "Manipulation"  => color.new(#E040FB, 0)
-        "Trending ▲"    => color.new(#00E676, 0)
-        "Trending ▼"    => color.new(#FF5252, 0)
+        "Expansion"     => color.new(#E040FB, 0)
+        "Trending Up"   => color.new(#00E676, 0)
+        "Trending Down" => color.new(#FF5252, 0)
         "Consolidation" => color.new(#9E9E9E, 0)
         => color.new(#FFD600, 0)
 
-    table.cell(phase_table, 0, 0, "MARKET PHASE", text_color=color.white, text_size=size.small)
-    table.cell(phase_table, 1, 0, market_phase, text_color=phase_col, text_size=size.small)
-    table.cell(phase_table, 0, 1, "TREND", text_color=color.white, text_size=size.tiny)
-    table.cell(phase_table, 1, 1, trend_dir == 1 ? "BULLISH" : trend_dir == -1 ? "BEARISH" : "NEUTRAL", text_color=trend_dir == 1 ? color.green : trend_dir == -1 ? color.red : color.gray, text_size=size.tiny)
-    table.cell(phase_table, 0, 2, "ZONE", text_color=color.white, text_size=size.tiny)
-    zone_display = pd_is_premium ? "PREMIUM" : pd_is_discount ? "DISCOUNT" : "EQUILIBRIUM"
-    zone_col_display = pd_is_premium ? color.red : pd_is_discount ? color.green : color.gray
-    table.cell(phase_table, 1, 2, zone_display, text_color=zone_col_display, text_size=size.tiny)
-    table.cell(phase_table, 0, 3, "VOLATILITY", text_color=color.white, text_size=size.tiny)
-    vol_state = atr_val > ta.sma(atr_val, 20) * 1.2 ? "HIGH" : atr_val < ta.sma(atr_val, 20) * 0.8 ? "LOW" : "NORMAL"
-    vol_col_state = vol_state == "HIGH" ? color.orange : vol_state == "LOW" ? color.aqua : color.gray
-    table.cell(phase_table, 1, 3, vol_state, text_color=vol_col_state, text_size=size.tiny)
+    table.cell(phase_tbl, 0, 0, "PHASE",     text_color=color.white, text_size=size.tiny)
+    table.cell(phase_tbl, 1, 0, market_phase, text_color=phase_col,  text_size=size.tiny)
+
+    trend_txt = trend_dir == 1 ? "BULLISH" : trend_dir == -1 ? "BEARISH" : "NEUTRAL"
+    trend_col = trend_dir == 1 ? color.green : trend_dir == -1 ? color.red : color.gray
+    table.cell(phase_tbl, 0, 1, "TREND",     text_color=color.white, text_size=size.tiny)
+    table.cell(phase_tbl, 1, 1, trend_txt,    text_color=trend_col,  text_size=size.tiny)
+
+    zone_txt = pd_is_premium ? "PREMIUM" : pd_is_discount ? "DISCOUNT" : "EQ"
+    zone_col = pd_is_premium ? color.red : pd_is_discount ? color.green : color.gray
+    table.cell(phase_tbl, 0, 2, "ZONE",      text_color=color.white, text_size=size.tiny)
+    table.cell(phase_tbl, 1, 2, zone_txt,     text_color=zone_col,   text_size=size.tiny)
+
+    vol_state = atr_val > atr_sma_20 * 1.2 ? "HIGH" : atr_val < atr_sma_20 * 0.8 ? "LOW" : "NORMAL"
+    vol_s_col = vol_state == "HIGH" ? color.orange : vol_state == "LOW" ? color.aqua : color.gray
+    table.cell(phase_tbl, 0, 3, "VOLATILITY", text_color=color.white, text_size=size.tiny)
+    table.cell(phase_tbl, 1, 3, vol_state,     text_color=vol_s_col,  text_size=size.tiny)
+
+    conf_dash = conf_score >= 5 ? "STRONG" : conf_score >= 3 ? "MODERATE" : conf_score >= 2 ? "WEAK" : "NONE"
+    conf_d_col = conf_score >= 5 ? #FFD600 : conf_score >= 3 ? #FF9800 : color.gray
+    table.cell(phase_tbl, 0, 4, "CONFLUENCE", text_color=color.white, text_size=size.tiny)
+    table.cell(phase_tbl, 1, 4, conf_dash + " (" + str.tostring(conf_score) + ")", text_color=conf_d_col, text_size=size.tiny)
 
 // ══════════════════════════════════════════════════════════════════════════════
-// ░░░░░░░░░░░░░░░░░░░░░░░░░░ 11. VOLUME CLIMAX / EXHAUSTION ░░░░░░░░░░░░░░░
+// ░░░░░░░░░░░░░░░░░░░░ DASHBOARD TABLE ░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
 // ══════════════════════════════════════════════════════════════════════════════
 
-vol_sma = ta.sma(volume, vol_sma_len)
-vol_is_climax = volume > vol_sma * vol_climax_mult
+var table dash_tbl = na
 
-// Exhaustion: high volume + doji/small body + long wicks
-body_size = math.abs(close - open)
-total_range = high - low
-is_small_body = total_range > 0 ? body_size / total_range < 0.3 : false
-vol_is_exhaustion = volume > vol_sma * vol_exhaust_mult and is_small_body
-
-// Volume divergence: price makes new high/low but volume decreasing
-vol_div_bear = not na(swing_high) and swing_high > nz(prev_swing_high) and volume < vol_sma * 0.8
-vol_div_bull = not na(swing_low) and swing_low < nz(prev_swing_low) and volume < vol_sma * 0.8
-
-if show_volume_climax
-    if vol_is_exhaustion
-        label.new(bar_index, high, "💀", style=label.style_label_down, color=color.new(color.black, 100), textcolor=vol_exhaust_color, size=size.small, tooltip="Volume Exhaustion: High volume + small body")
-    else if vol_is_climax
-        plotchar(true, "Vol Climax", "⚡", location.abovebar, color=vol_climax_color, size=size.tiny)
-
-    if vol_div_bear
-        label.new(bar_index - swing_length, swing_high, "Vol Div ▼", style=label.style_label_down, color=color.new(#E040FB, 50), textcolor=#E040FB, size=size.tiny)
-
-    if vol_div_bull
-        label.new(bar_index - swing_length, swing_low, "Vol Div ▲", style=label.style_label_up, color=color.new(#00BCD4, 50), textcolor=#00BCD4, size=size.tiny)
-
-// Volume histogram coloring
-vol_color = vol_is_exhaustion ? vol_exhaust_color : vol_is_climax ? vol_climax_color : close > open ? color.new(#00E676, 60) : color.new(#FF5252, 60)
-
-// ══════════════════════════════════════════════════════════════════════════════
-// ░░░░░░░░░░░░░░░░░░░░░░░░░░ 2. CONFLUENCE DETECTION ░░░░░░░░░░░░░░░░░░░░░░
-// ══════════════════════════════════════════════════════════════════════════════
-
-// Confluence scoring at current price level
-conf_score = 0
-conf_zone_range = atr_val * conf_zone_atr_mult
-
-if show_confluence
-    // Check if price is near an Order Block
-    if array.size(ob_array) > 0
-        for i = math.max(0, array.size(ob_array) - 10) to array.size(ob_array) - 1
-            if i >= array.size(ob_array)
-                break
-            ob = array.get(ob_array, i)
-            if not ob.is_mitigated
-                if close >= ob.bottom - conf_zone_range and close <= ob.top + conf_zone_range
-                    conf_score += 2
-
-    // Check if price is near an S/D Zone
-    if array.size(sd_array) > 0
-        for i = math.max(0, array.size(sd_array) - 10) to array.size(sd_array) - 1
-            if i >= array.size(sd_array)
-                break
-            sd = array.get(sd_array, i)
-            if sd.status < 2
-                if close >= sd.bottom - conf_zone_range and close <= sd.top + conf_zone_range
-                    conf_score += 2
-
-    // Check if price is near an FVG
-    if array.size(fvg_array) > 0
-        for i = math.max(0, array.size(fvg_array) - 10) to array.size(fvg_array) - 1
-            if i >= array.size(fvg_array)
-                break
-            fvg = array.get(fvg_array, i)
-            if not fvg.is_filled
-                if close >= fvg.bottom - conf_zone_range and close <= fvg.top + conf_zone_range
-                    conf_score += 1
-
-    // Check if price is near a liquidity level
-    if array.size(liq_array) > 0
-        for i = math.max(0, array.size(liq_array) - 10) to array.size(liq_array) - 1
-            if i >= array.size(liq_array)
-                break
-            liq = array.get(liq_array, i)
-            if not liq.is_swept
-                if math.abs(close - liq.price) <= conf_zone_range
-                    conf_score += 1
-
-    // Check if in OTE zone
-    if show_ote and not na(pd_range_high) and not na(pd_range_low)
-        r = pd_range_high - pd_range_low
-        if r > 0
-            fib_pos = (close - pd_range_low) / r
-            if (trend_dir == 1 and fib_pos >= (1 - ote_fib_end) and fib_pos <= (1 - ote_fib_start)) or (trend_dir == -1 and fib_pos >= ote_fib_start and fib_pos <= ote_fib_end)
-                conf_score += 1
-
-    // Check Premium/Discount alignment with trend
-    if pd_is_discount and trend_dir == 1
-        conf_score += 1
-    if pd_is_premium and trend_dir == -1
-        conf_score += 1
-
-    // Display confluence
-    if conf_score >= conf_min_factors
-        conf_display_col = conf_score >= 5 ? color.new(#FFD600, 30) : conf_score >= 3 ? color.new(#FF9800, 50) : color.new(#9E9E9E, 60)
-        bgcolor(conf_display_col, title="Confluence Zone")
-
-// Confluence label on strong zones
-if show_confluence and barstate.islast and conf_score >= conf_min_factors
-    conf_txt = "⚡ CONFLUENCE: " + str.tostring(conf_score) + " factors"
-    conf_col = conf_score >= 5 ? #FFD600 : conf_score >= 3 ? #FF9800 : #9E9E9E
-    label.new(bar_index, high + atr_val * 0.5, conf_txt, style=label.style_label_down, color=color.new(conf_col, 30), textcolor=color.white, size=size.small)
-
-// ══════════════════════════════════════════════════════════════════════════════
-// ░░░░░░░░░░░░░░░░░░░░░░░░░░ EXTRA: SESSION LEVELS ░░░░░░░░░░░░░░░░░░░░░░░░
-// ══════════════════════════════════════════════════════════════════════════════
-
-grp_extra = "═══ EXTRA FEATURES ═══"
-show_prev_day = input.bool(false, "Previous Day High/Low", group=grp_extra)
-show_killzones = input.bool(false, "Killzone Highlights", group=grp_extra)
-show_atr_levels = input.bool(false, "ATR Projection Levels", group=grp_extra)
-show_ema_ribbon = input.bool(false, "EMA Ribbon (9/21/50)", group=grp_extra)
-
-// Previous Day High/Low
-prev_day_high = request.security(syminfo.tickerid, "D", high[1], lookahead=barmerge.lookahead_on)
-prev_day_low  = request.security(syminfo.tickerid, "D", low[1], lookahead=barmerge.lookahead_on)
-
-if show_prev_day and barstate.islast
-    line.new(bar_index - 50, prev_day_high, bar_index + 5, prev_day_high, color=color.new(#2196F3, 30), style=line.style_solid, width=1)
-    line.new(bar_index - 50, prev_day_low, bar_index + 5, prev_day_low, color=color.new(#2196F3, 30), style=line.style_solid, width=1)
-    label.new(bar_index + 5, prev_day_high, "PDH", style=label.style_label_left, color=color.new(color.black, 100), textcolor=#2196F3, size=size.tiny)
-    label.new(bar_index + 5, prev_day_low, "PDL", style=label.style_label_left, color=color.new(color.black, 100), textcolor=#2196F3, size=size.tiny)
-
-// ATR Projection
-if show_atr_levels and barstate.islast
-    atr_proj = ta.atr(14)
-    line.new(bar_index, close + atr_proj, bar_index + 10, close + atr_proj, color=color.new(color.orange, 50), style=line.style_dotted, width=1)
-    line.new(bar_index, close - atr_proj, bar_index + 10, close - atr_proj, color=color.new(color.orange, 50), style=line.style_dotted, width=1)
-    label.new(bar_index + 10, close + atr_proj, "+1 ATR", style=label.style_label_left, color=color.new(color.black, 100), textcolor=color.orange, size=size.tiny)
-    label.new(bar_index + 10, close - atr_proj, "-1 ATR", style=label.style_label_left, color=color.new(color.black, 100), textcolor=color.orange, size=size.tiny)
-
-// EMA Ribbon
-ema9  = ta.ema(close, 9)
-ema21 = ta.ema(close, 21)
-ema50 = ta.ema(close, 50)
-
-plot(show_ema_ribbon ? ema9  : na, "EMA 9",  color=color.new(#00E676, 40), linewidth=1)
-plot(show_ema_ribbon ? ema21 : na, "EMA 21", color=color.new(#FFD600, 40), linewidth=1)
-plot(show_ema_ribbon ? ema50 : na, "EMA 50", color=color.new(#FF5252, 40), linewidth=2)
-
-// ══════════════════════════════════════════════════════════════════════════════
-// ░░░░░░░░░░░░░░░░░░░░░░░░░░ ALERTS ░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
-// ══════════════════════════════════════════════════════════════════════════════
-
-if show_alerts
-    // Structure alerts
-    alertcondition(bos_bull, "BOS Bullish", "Bullish Break of Structure detected")
-    alertcondition(bos_bear, "BOS Bearish", "Bearish Break of Structure detected")
-    alertcondition(choch_bull, "CHoCH Bullish", "Bullish Change of Character detected")
-    alertcondition(choch_bear, "CHoCH Bearish", "Bearish Change of Character detected")
-
-    // Sweep alerts
-    alertcondition(sweep_bull, "Bullish Sweep Reversal", "Liquidity sweep + bullish reversal")
-    alertcondition(sweep_bear, "Bearish Sweep Reversal", "Liquidity sweep + bearish reversal")
-
-    // Volume alerts
-    alertcondition(vol_is_exhaustion, "Volume Exhaustion", "Volume exhaustion signal detected")
-    alertcondition(vol_is_climax, "Volume Climax", "Volume climax detected")
-
-    // Confluence alert
-    alertcondition(conf_score >= conf_min_factors, "Confluence Zone", "Price in confluence zone with multiple factors")
-
-// ══════════════════════════════════════════════════════════════════════════════
-// ░░░░░░░░░░░░░░░░░░░░░░░░░░ DASHBOARD TABLE ░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
-// ══════════════════════════════════════════════════════════════════════════════
-
-grp_dash = "═══ DASHBOARD ═══"
-show_dashboard = input.bool(true, "Show Dashboard", group=grp_dash)
-dash_position = input.string("Bottom Right", "Dashboard Position", options=["Top Right","Top Left","Bottom Right","Bottom Left"], group=grp_dash)
-
-if show_dashboard and barstate.islast
-    dash_pos = switch dash_position
+if show_dashboard
+    d_pos = switch dash_position
         "Top Right"    => position.top_right
         "Top Left"     => position.top_left
         "Bottom Right" => position.bottom_right
         "Bottom Left"  => position.bottom_left
         => position.bottom_right
 
-    // Avoid conflict with phase table
-    actual_dash_pos = dash_position == phase_label_pos and show_market_phase ? position.bottom_left : dash_pos
+    // Avoid overlap with phase table
+    actual_pos = show_market_phase and dash_position == phase_tbl_pos ? position.bottom_left : d_pos
 
-    var table dash = table.new(actual_dash_pos, 2, 8, bgcolor=color.new(#1E1E1E, 10), border_width=1, border_color=color.new(color.gray, 50))
+    if na(dash_tbl)
+        dash_tbl := table.new(actual_pos, 2, 8, bgcolor=color.new(#1E1E1E, 10), border_width=1, border_color=color.new(color.gray, 50))
 
-    table.cell(dash, 0, 0, "SMC TOOLKIT", text_color=#FFD600, text_size=size.small)
-    table.cell(dash, 1, 0, "v6.0", text_color=color.gray, text_size=size.tiny)
+    table.cell(dash_tbl, 0, 0, "SMC SCANNER", text_color=#FFD600, text_size=size.small)
+    table.cell(dash_tbl, 1, 0, "v6.0",        text_color=color.gray, text_size=size.tiny)
 
     // Active OBs
     active_obs = 0
-    if array.size(ob_array) > 0
-        for i = 0 to array.size(ob_array) - 1
-            ob = array.get(ob_array, i)
+    for i = 0 to array.size(ob_arr) - 1
+        if i < array.size(ob_arr)
+            ob = array.get(ob_arr, i)
             if not ob.is_mitigated
                 active_obs += 1
-    table.cell(dash, 0, 1, "Order Blocks", text_color=color.white, text_size=size.tiny)
-    table.cell(dash, 1, 1, str.tostring(active_obs) + " active", text_color=active_obs > 0 ? color.green : color.gray, text_size=size.tiny)
+    table.cell(dash_tbl, 0, 1, "Order Blocks", text_color=color.white, text_size=size.tiny)
+    table.cell(dash_tbl, 1, 1, str.tostring(active_obs) + " active", text_color=active_obs > 0 ? color.green : color.gray, text_size=size.tiny)
 
-    // Active S/D Zones
+    // Active S/D
     active_sd = 0
-    if array.size(sd_array) > 0
-        for i = 0 to array.size(sd_array) - 1
-            sd = array.get(sd_array, i)
+    for i = 0 to array.size(sd_arr) - 1
+        if i < array.size(sd_arr)
+            sd = array.get(sd_arr, i)
             if sd.status < 2
                 active_sd += 1
-    table.cell(dash, 0, 2, "S/D Zones", text_color=color.white, text_size=size.tiny)
-    table.cell(dash, 1, 2, str.tostring(active_sd) + " active", text_color=active_sd > 0 ? color.green : color.gray, text_size=size.tiny)
+    table.cell(dash_tbl, 0, 2, "S/D Zones", text_color=color.white, text_size=size.tiny)
+    table.cell(dash_tbl, 1, 2, str.tostring(active_sd) + " active", text_color=active_sd > 0 ? color.green : color.gray, text_size=size.tiny)
 
     // Active FVGs
     active_fvg = 0
-    if array.size(fvg_array) > 0
-        for i = 0 to array.size(fvg_array) - 1
-            fvg = array.get(fvg_array, i)
+    for i = 0 to array.size(fvg_arr) - 1
+        if i < array.size(fvg_arr)
+            fvg = array.get(fvg_arr, i)
             if not fvg.is_filled
                 active_fvg += 1
-    table.cell(dash, 0, 3, "FVGs", text_color=color.white, text_size=size.tiny)
-    table.cell(dash, 1, 3, str.tostring(active_fvg) + " open", text_color=active_fvg > 0 ? color.blue : color.gray, text_size=size.tiny)
+    table.cell(dash_tbl, 0, 3, "FVGs", text_color=color.white, text_size=size.tiny)
+    table.cell(dash_tbl, 1, 3, str.tostring(active_fvg) + " open", text_color=active_fvg > 0 ? color.blue : color.gray, text_size=size.tiny)
 
-    // Liquidity levels
+    // Liquidity
     active_liq = 0
-    if array.size(liq_array) > 0
-        for i = 0 to array.size(liq_array) - 1
-            liq = array.get(liq_array, i)
-            if not liq.is_swept
+    for i = 0 to array.size(liq_arr) - 1
+        if i < array.size(liq_arr)
+            lv = array.get(liq_arr, i)
+            if not lv.is_swept
                 active_liq += 1
-    table.cell(dash, 0, 4, "Liquidity", text_color=color.white, text_size=size.tiny)
-    table.cell(dash, 1, 4, str.tostring(active_liq) + " levels", text_color=active_liq > 0 ? #FFD600 : color.gray, text_size=size.tiny)
-
-    // Confluence
-    table.cell(dash, 0, 5, "Confluence", text_color=color.white, text_size=size.tiny)
-    conf_txt_dash = conf_score >= 5 ? "STRONG (" + str.tostring(conf_score) + ")" : conf_score >= 3 ? "MODERATE (" + str.tostring(conf_score) + ")" : conf_score >= 2 ? "WEAK (" + str.tostring(conf_score) + ")" : "NONE"
-    conf_col_dash = conf_score >= 5 ? #FFD600 : conf_score >= 3 ? #FF9800 : conf_score >= 2 ? color.gray : color.new(color.gray, 50)
-    table.cell(dash, 1, 5, conf_txt_dash, text_color=conf_col_dash, text_size=size.tiny)
+    table.cell(dash_tbl, 0, 4, "Liquidity", text_color=color.white, text_size=size.tiny)
+    table.cell(dash_tbl, 1, 4, str.tostring(active_liq) + " levels", text_color=active_liq > 0 ? #FFD600 : color.gray, text_size=size.tiny)
 
     // ATR
-    table.cell(dash, 0, 6, "ATR(14)", text_color=color.white, text_size=size.tiny)
-    table.cell(dash, 1, 6, str.tostring(atr_val, "#.#####"), text_color=color.gray, text_size=size.tiny)
+    table.cell(dash_tbl, 0, 5, "ATR(14)", text_color=color.white, text_size=size.tiny)
+    table.cell(dash_tbl, 1, 5, str.tostring(atr_val, "#.#####"), text_color=color.gray, text_size=size.tiny)
 
-    // Volume status
-    vol_status = vol_is_exhaustion ? "EXHAUSTION" : vol_is_climax ? "CLIMAX" : volume > vol_sma ? "ABOVE AVG" : "BELOW AVG"
-    vol_status_col = vol_is_exhaustion ? #E040FB : vol_is_climax ? #FFD600 : volume > vol_sma ? color.green : color.gray
-    table.cell(dash, 0, 7, "Volume", text_color=color.white, text_size=size.tiny)
-    table.cell(dash, 1, 7, vol_status, text_color=vol_status_col, text_size=size.tiny)
+    // Volume
+    v_status = vol_is_exhaust ? "EXHAUSTION" : vol_is_climax ? "CLIMAX" : volume > vol_sma_val ? "ABOVE AVG" : "BELOW AVG"
+    v_col = vol_is_exhaust ? #E040FB : vol_is_climax ? #FFD600 : volume > vol_sma_val ? color.green : color.gray
+    table.cell(dash_tbl, 0, 6, "Volume", text_color=color.white, text_size=size.tiny)
+    table.cell(dash_tbl, 1, 6, v_status, text_color=v_col, text_size=size.tiny)
+
+    // Sweep + Reversal status
+    sr_txt = sweep_rev_bull ? "BULL TRIGGER" : sweep_rev_bear ? "BEAR TRIGGER" : sweep_bull_sig ? "BULL SWEEP" : sweep_bear_sig ? "BEAR SWEEP" : "—"
+    sr_col = sweep_rev_bull ? color.lime : sweep_rev_bear ? color.red : sweep_bull_sig or sweep_bear_sig ? color.orange : color.gray
+    table.cell(dash_tbl, 0, 7, "Sweep/Rev", text_color=color.white, text_size=size.tiny)
+    table.cell(dash_tbl, 1, 7, sr_txt, text_color=sr_col, text_size=size.tiny)
+
+// ══════════════════════════════════════════════════════════════════════════════
+// ░░░░░░░░░░░░░░░░░░░░ ALERTS (global scope — v6 requirement) ░░░░░░░░░░░░░░
+// ══════════════════════════════════════════════════════════════════════════════
+
+// Structure
+alertcondition(bos_bull,       "BOS Bullish",         "Bullish Break of Structure")
+alertcondition(bos_bear,       "BOS Bearish",         "Bearish Break of Structure")
+alertcondition(choch_bull,     "CHoCH Bullish",       "Bullish Change of Character")
+alertcondition(choch_bear,     "CHoCH Bearish",       "Bearish Change of Character")
+
+// Liquidity sweep
+alertcondition(sweep_bull_sig, "Bullish Liq Sweep",   "Liquidity swept below swing low")
+alertcondition(sweep_bear_sig, "Bearish Liq Sweep",   "Liquidity swept above swing high")
+
+// Sweep + Reversal trigger
+alertcondition(sweep_rev_bull, "Sweep+Rev Bullish",   "Bullish sweep + CHoCH/FVG reversal confirmed")
+alertcondition(sweep_rev_bear, "Sweep+Rev Bearish",   "Bearish sweep + CHoCH/FVG reversal confirmed")
+
+// Diagonal break
+alertcondition(diag_bull_break, "Trendline Break Bull", "Bearish trendline broken — bullish")
+alertcondition(diag_bear_break, "Trendline Break Bear", "Bullish trendline broken — bearish")
+
+// Volume
+alertcondition(vol_is_climax,  "Volume Climax",       "Volume climax detected")
+alertcondition(vol_is_exhaust, "Volume Exhaustion",    "Volume exhaustion — high volume + small body")
+alertcondition(vol_div_bear,   "Vol Divergence Bear",  "Bearish volume divergence at swing high")
+alertcondition(vol_div_bull,   "Vol Divergence Bull",  "Bullish volume divergence at swing low")
+
+// Confluence
+alertcondition(conf_score >= conf_min_factors, "Confluence Zone", "Price in high-probability confluence zone")
 
 // ══════════════════════════════════════════════════════════════════════════════
 // ░░░░░░░░░░░░░░░░░░░░░░░░░░ END ░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░

@@ -13,8 +13,9 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Next.js Template",
-  description: "A minimal Next.js starter template",
+  title: "SMC Ultimate Trading Toolkit v6 | Smart Money Concepts Indicator",
+  description:
+    "Professional TradingView indicator with 14+ Smart Money Concepts modules: BOS/CHoCH, Order Blocks, Supply/Demand Zones, FVG, Liquidity Sweeps, OTE, and more.",
 };
 
 export default function RootLayout({
@@ -23,9 +24,9 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en">
+    <html lang="en" className="scroll-smooth">
       <body
-        className={`${geistSans.variable} ${geistMono.variable} antialiased`}
+        className={`${geistSans.variable} ${geistMono.variable} antialiased bg-[#0a0a0f] text-white`}
       >
         {children}
       </body>

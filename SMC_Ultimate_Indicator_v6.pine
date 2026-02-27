@@ -273,14 +273,15 @@ if show_fvg or show_sweep_rev or show_confluence
             last_fvg_bar := bar_index
 
     // Check fill status
-    if array.size(fvg_arr) > 0
-        for i = array.size(fvg_arr) - 1 to 0
-            fvg = array.get(fvg_arr, i)
-            if not fvg.is_filled
-                if fvg.is_bull and low <= fvg.bottom
-                    fvg.is_filled := true
-                if not fvg.is_bull and high >= fvg.top
-                    fvg.is_filled := true
+    for i = math.max(0, array.size(fvg_arr) - 1) to 0
+        if i >= array.size(fvg_arr)
+            continue
+        fvg = array.get(fvg_arr, i)
+        if not fvg.is_filled
+            if fvg.is_bull and low <= fvg.bottom
+                fvg.is_filled := true
+            if not fvg.is_bull and high >= fvg.top
+                fvg.is_filled := true
 
     // Trim excess
     while array.size(fvg_arr) > fvg_max_display * 3
@@ -318,21 +319,22 @@ if show_orderblocks or show_confluence
         array.push(ob_arr, OrderBlock.new(high[1], low[1], bar_index - 1, false, false, 0))
 
     // Mitigation check: 50% penetration
-    if array.size(ob_arr) > 0
-        for i = array.size(ob_arr) - 1 to 0
-            ob = array.get(ob_arr, i)
+    for i = math.max(0, array.size(ob_arr) - 1) to 0
+        if i >= array.size(ob_arr)
+            continue
+        ob = array.get(ob_arr, i)
+        if not ob.is_mitigated
+            ob_mid = ob.bottom + (ob.top - ob.bottom) * (ob_mitigation_pct / 100.0)
+            if ob.is_bull and close < ob_mid
+                ob.is_mitigated := true
+            if not ob.is_bull and close > (ob.top - (ob.top - ob.bottom) * (ob_mitigation_pct / 100.0))
+                ob.is_mitigated := true
+            // Track touches (price enters zone but doesn't mitigate)
             if not ob.is_mitigated
-                ob_mid = ob.bottom + (ob.top - ob.bottom) * (ob_mitigation_pct / 100.0)
-                if ob.is_bull and close < ob_mid
-                    ob.is_mitigated := true
-                if not ob.is_bull and close > (ob.top - (ob.top - ob.bottom) * (ob_mitigation_pct / 100.0))
-                    ob.is_mitigated := true
-                // Track touches (price enters zone but doesn't mitigate)
-                if not ob.is_mitigated
-                    if ob.is_bull and low <= ob.top and low >= ob.bottom
-                        ob.touch_count += 1
-                    if not ob.is_bull and high >= ob.bottom and high <= ob.top
-                        ob.touch_count += 1
+                if ob.is_bull and low <= ob.top and low >= ob.bottom
+                    ob.touch_count += 1
+                if not ob.is_bull and high >= ob.bottom and high <= ob.top
+                    ob.touch_count += 1
 
     // Trim
     while array.size(ob_arr) > ob_max_display * 3
@@ -368,19 +370,20 @@ if show_sd_zones or show_confluence
             array.push(sd_arr, SDZone.new(zt, zb, bar_index - 1, false, 0))
 
     // Status updates
-    if array.size(sd_arr) > 0
-        for i = array.size(sd_arr) - 1 to 0
-            sd = array.get(sd_arr, i)
-            if sd.status == 0
-                if sd.is_demand and low <= sd.top and close > sd.bottom
-                    sd.status := 1
-                if not sd.is_demand and high >= sd.bottom and close < sd.top
-                    sd.status := 1
-            if sd.status <= 1
-                if sd.is_demand and close < sd.bottom
-                    sd.status := 2
-                if not sd.is_demand and close > sd.top
-                    sd.status := 2
+    for i = math.max(0, array.size(sd_arr) - 1) to 0
+        if i >= array.size(sd_arr)
+            continue
+        sd = array.get(sd_arr, i)
+        if sd.status == 0
+            if sd.is_demand and low <= sd.top and close > sd.bottom
+                sd.status := 1
+            if not sd.is_demand and high >= sd.bottom and close < sd.top
+                sd.status := 1
+        if sd.status <= 1
+            if sd.is_demand and close < sd.bottom
+                sd.status := 2
+            if not sd.is_demand and close > sd.top
+                sd.status := 2
 
     while array.size(sd_arr) > sd_max_zones * 3
         array.shift(sd_arr)
@@ -416,20 +419,22 @@ if show_liquidity or show_sweep_rev or show_confluence
     // Detect Equal Highs / Equal Lows
     if not na(swing_hi) and not na(prev_sh) and math.abs(swing_hi - prev_sh) < atr_val * liq_eq_tolerance
         // Mark as equal highs
-        if array.size(liq_arr) > 0
-            for i = array.size(liq_arr) - 1 to math.max(0, array.size(liq_arr) - 5)
-                lv = array.get(liq_arr, i)
-                if lv.is_high and not lv.is_swept and math.abs(lv.price - swing_hi) < atr_val * liq_eq_tolerance
-                    lv.is_equal := true
-                    lv.lbl_text := "EQH $"
+        for i = math.max(0, array.size(liq_arr) - 1) to math.max(0, array.size(liq_arr) - 5)
+            if i >= array.size(liq_arr)
+                continue
+            lv = array.get(liq_arr, i)
+            if lv.is_high and not lv.is_swept and math.abs(lv.price - swing_hi) < atr_val * liq_eq_tolerance
+                lv.is_equal := true
+                lv.lbl_text := "EQH $"
 
     if not na(swing_lo) and not na(prev_sl) and math.abs(swing_lo - prev_sl) < atr_val * liq_eq_tolerance
-        if array.size(liq_arr) > 0
-            for i = array.size(liq_arr) - 1 to math.max(0, array.size(liq_arr) - 5)
-                lv = array.get(liq_arr, i)
-                if not lv.is_high and not lv.is_swept and math.abs(lv.price - swing_lo) < atr_val * liq_eq_tolerance
-                    lv.is_equal := true
-                    lv.lbl_text := "EQL $"
+        for i = math.max(0, array.size(liq_arr) - 1) to math.max(0, array.size(liq_arr) - 5)
+            if i >= array.size(liq_arr)
+                continue
+            lv = array.get(liq_arr, i)
+            if not lv.is_high and not lv.is_swept and math.abs(lv.price - swing_lo) < atr_val * liq_eq_tolerance
+                lv.is_equal := true
+                lv.lbl_text := "EQL $"
 
     // Previous day high/low as liquidity (using global-scope request.security)
     if new_day_flag and not na(prev_day_h)
@@ -437,16 +442,17 @@ if show_liquidity or show_sweep_rev or show_confluence
         array.push(liq_arr, LiqLevel.new(prev_day_l, bar_index, false, false, false, "PDL $"))
 
     // Check sweeps (wick through level, close back inside)
-    if array.size(liq_arr) > 0
-        for i = array.size(liq_arr) - 1 to 0
-            lv = array.get(liq_arr, i)
-            if not lv.is_swept
-                if lv.is_high and high > lv.price and close < lv.price
-                    lv.is_swept := true
-                    sweep_bear_sig := true
-                if not lv.is_high and low < lv.price and close > lv.price
-                    lv.is_swept := true
-                    sweep_bull_sig := true
+    for i = math.max(0, array.size(liq_arr) - 1) to 0
+        if i >= array.size(liq_arr)
+            continue
+        lv = array.get(liq_arr, i)
+        if not lv.is_swept
+            if lv.is_high and high > lv.price and close < lv.price
+                lv.is_swept := true
+                sweep_bear_sig := true
+            if not lv.is_high and low < lv.price and close > lv.price
+                lv.is_swept := true
+                sweep_bull_sig := true
 
     // Trim to lookback limit
     while array.size(liq_arr) > liq_lookback
@@ -633,48 +639,44 @@ conf_range = nz(atr_val) * conf_zone_atr_mult
 
 if show_confluence
     // Factor 1: Near active Order Block
-    if array.size(ob_arr) > 0
-        for i = math.max(0, array.size(ob_arr) - 10) to array.size(ob_arr) - 1
-            if i >= array.size(ob_arr)
-                break
-            ob = array.get(ob_arr, i)
-            if not ob.is_mitigated
-                if close >= ob.bottom - conf_range and close <= ob.top + conf_range
-                    conf_score += 1
-                    break  // count once
+    for i = math.max(0, array.size(ob_arr) - 10) to math.max(0, array.size(ob_arr) - 1)
+        if i >= array.size(ob_arr)
+            break
+        ob = array.get(ob_arr, i)
+        if not ob.is_mitigated
+            if close >= ob.bottom - conf_range and close <= ob.top + conf_range
+                conf_score += 1
+                break  // count once
 
     // Factor 2: Near active S/D Zone
-    if array.size(sd_arr) > 0
-        for i = math.max(0, array.size(sd_arr) - 10) to array.size(sd_arr) - 1
-            if i >= array.size(sd_arr)
+    for i = math.max(0, array.size(sd_arr) - 10) to math.max(0, array.size(sd_arr) - 1)
+        if i >= array.size(sd_arr)
+            break
+        sd = array.get(sd_arr, i)
+        if sd.status < 2
+            if close >= sd.bottom - conf_range and close <= sd.top + conf_range
+                conf_score += 1
                 break
-            sd = array.get(sd_arr, i)
-            if sd.status < 2
-                if close >= sd.bottom - conf_range and close <= sd.top + conf_range
-                    conf_score += 1
-                    break
 
     // Factor 3: Near unfilled FVG
-    if array.size(fvg_arr) > 0
-        for i = math.max(0, array.size(fvg_arr) - 10) to array.size(fvg_arr) - 1
-            if i >= array.size(fvg_arr)
+    for i = math.max(0, array.size(fvg_arr) - 10) to math.max(0, array.size(fvg_arr) - 1)
+        if i >= array.size(fvg_arr)
+            break
+        fvg = array.get(fvg_arr, i)
+        if not fvg.is_filled
+            if close >= fvg.bottom - conf_range and close <= fvg.top + conf_range
+                conf_score += 1
                 break
-            fvg = array.get(fvg_arr, i)
-            if not fvg.is_filled
-                if close >= fvg.bottom - conf_range and close <= fvg.top + conf_range
-                    conf_score += 1
-                    break
 
     // Factor 4: Near liquidity level
-    if array.size(liq_arr) > 0
-        for i = math.max(0, array.size(liq_arr) - 10) to array.size(liq_arr) - 1
-            if i >= array.size(liq_arr)
+    for i = math.max(0, array.size(liq_arr) - 10) to math.max(0, array.size(liq_arr) - 1)
+        if i >= array.size(liq_arr)
+            break
+        lv = array.get(liq_arr, i)
+        if not lv.is_swept
+            if math.abs(close - lv.price) <= conf_range
+                conf_score += 1
                 break
-            lv = array.get(liq_arr, i)
-            if not lv.is_swept
-                if math.abs(close - lv.price) <= conf_range
-                    conf_score += 1
-                    break
 
     // Factor 5: Near diagonal trendline
     if not na(diag_bull_slope) and not na(diag_bull_start_bar) and not na(diag_bull_start_p)
@@ -712,24 +714,27 @@ bgcolor(show_confluence and conf_score >= conf_min_factors ? conf_bg_col : na, t
 
 if barstate.islast
     // Cleanup previous barstate.islast drawings
-    if array.size(_lines) > 0
-        for _i = 0 to array.size(_lines) - 1
-            line.delete(array.get(_lines, _i))
-        array.clear(_lines)
-    if array.size(_boxes) > 0
-        for _i = 0 to array.size(_boxes) - 1
-            box.delete(array.get(_boxes, _i))
-        array.clear(_boxes)
-    if array.size(_labels) > 0
-        for _i = 0 to array.size(_labels) - 1
-            label.delete(array.get(_labels, _i))
-        array.clear(_labels)
+    for _i = 0 to math.max(0, array.size(_lines) - 1)
+        if _i >= array.size(_lines)
+            break
+        line.delete(array.get(_lines, _i))
+    array.clear(_lines)
+    for _i = 0 to math.max(0, array.size(_boxes) - 1)
+        if _i >= array.size(_boxes)
+            break
+        box.delete(array.get(_boxes, _i))
+    array.clear(_boxes)
+    for _i = 0 to math.max(0, array.size(_labels) - 1)
+        if _i >= array.size(_labels)
+            break
+        label.delete(array.get(_labels, _i))
+    array.clear(_labels)
 
     // ──── Draw Order Blocks ────
-    if show_orderblocks and array.size(ob_arr) > 0
+    if show_orderblocks
         drawn_ob = 0
-        for i = array.size(ob_arr) - 1 to 0
-            if drawn_ob >= ob_max_display
+        for i = math.max(0, array.size(ob_arr) - 1) to 0
+            if i >= array.size(ob_arr) or drawn_ob >= ob_max_display
                 break
             ob = array.get(ob_arr, i)
             if not ob.is_mitigated
@@ -740,10 +745,10 @@ if barstate.islast
                 drawn_ob += 1
 
     // ──── Draw Supply / Demand Zones ────
-    if show_sd_zones and array.size(sd_arr) > 0
+    if show_sd_zones
         drawn_sd = 0
-        for i = array.size(sd_arr) - 1 to 0
-            if drawn_sd >= sd_max_zones
+        for i = math.max(0, array.size(sd_arr) - 1) to 0
+            if i >= array.size(sd_arr) or drawn_sd >= sd_max_zones
                 break
             sd = array.get(sd_arr, i)
             if sd.status < 2
@@ -755,10 +760,10 @@ if barstate.islast
                 drawn_sd += 1
 
     // ──── Draw FVGs ────
-    if show_fvg and array.size(fvg_arr) > 0
+    if show_fvg
         drawn_fvg = 0
-        for i = array.size(fvg_arr) - 1 to 0
-            if drawn_fvg >= fvg_max_display
+        for i = math.max(0, array.size(fvg_arr) - 1) to 0
+            if i >= array.size(fvg_arr) or drawn_fvg >= fvg_max_display
                 break
             fvg = array.get(fvg_arr, i)
             if not fvg.is_filled
@@ -768,10 +773,10 @@ if barstate.islast
                 drawn_fvg += 1
 
     // ──── Draw Liquidity Levels ────
-    if show_liquidity and array.size(liq_arr) > 0
+    if show_liquidity
         drawn_liq = 0
-        for i = array.size(liq_arr) - 1 to 0
-            if drawn_liq >= liq_max_display
+        for i = math.max(0, array.size(liq_arr) - 1) to 0
+            if i >= array.size(liq_arr) or drawn_liq >= liq_max_display
                 break
             lv = array.get(liq_arr, i)
             if not lv.is_swept
@@ -885,41 +890,45 @@ if show_dashboard
 
     // Active OBs
     active_obs = 0
-    if array.size(ob_arr) > 0
-        for i = 0 to array.size(ob_arr) - 1
-            ob = array.get(ob_arr, i)
-            if not ob.is_mitigated
-                active_obs += 1
+    for i = 0 to math.max(0, array.size(ob_arr) - 1)
+        if i >= array.size(ob_arr)
+            break
+        ob = array.get(ob_arr, i)
+        if not ob.is_mitigated
+            active_obs += 1
     table.cell(dash_tbl, 0, 1, "Order Blocks", text_color=color.white, text_size=size.tiny)
     table.cell(dash_tbl, 1, 1, str.tostring(active_obs) + " active", text_color=active_obs > 0 ? color.green : color.gray, text_size=size.tiny)
 
     // Active S/D
     active_sd = 0
-    if array.size(sd_arr) > 0
-        for i = 0 to array.size(sd_arr) - 1
-            sd = array.get(sd_arr, i)
-            if sd.status < 2
-                active_sd += 1
+    for i = 0 to math.max(0, array.size(sd_arr) - 1)
+        if i >= array.size(sd_arr)
+            break
+        sd = array.get(sd_arr, i)
+        if sd.status < 2
+            active_sd += 1
     table.cell(dash_tbl, 0, 2, "S/D Zones", text_color=color.white, text_size=size.tiny)
     table.cell(dash_tbl, 1, 2, str.tostring(active_sd) + " active", text_color=active_sd > 0 ? color.green : color.gray, text_size=size.tiny)
 
     // Active FVGs
     active_fvg = 0
-    if array.size(fvg_arr) > 0
-        for i = 0 to array.size(fvg_arr) - 1
-            fvg = array.get(fvg_arr, i)
-            if not fvg.is_filled
-                active_fvg += 1
+    for i = 0 to math.max(0, array.size(fvg_arr) - 1)
+        if i >= array.size(fvg_arr)
+            break
+        fvg = array.get(fvg_arr, i)
+        if not fvg.is_filled
+            active_fvg += 1
     table.cell(dash_tbl, 0, 3, "FVGs", text_color=color.white, text_size=size.tiny)
     table.cell(dash_tbl, 1, 3, str.tostring(active_fvg) + " open", text_color=active_fvg > 0 ? color.blue : color.gray, text_size=size.tiny)
 
     // Liquidity
     active_liq = 0
-    if array.size(liq_arr) > 0
-        for i = 0 to array.size(liq_arr) - 1
-            lv = array.get(liq_arr, i)
-            if not lv.is_swept
-                active_liq += 1
+    for i = 0 to math.max(0, array.size(liq_arr) - 1)
+        if i >= array.size(liq_arr)
+            break
+        lv = array.get(liq_arr, i)
+        if not lv.is_swept
+            active_liq += 1
     table.cell(dash_tbl, 0, 4, "Liquidity", text_color=color.white, text_size=size.tiny)
     table.cell(dash_tbl, 1, 4, str.tostring(active_liq) + " levels", text_color=active_liq > 0 ? #FFD600 : color.gray, text_size=size.tiny)
 

@@ -1,8 +1,8 @@
 // This Pine Script™ code is subject to the terms of the Mozilla Public License 2.0 at https://mozilla.org/MPL/2.0/
-// © SMC Ultimate Trading Toolkit v6 — All-in-One Institutional Market Scanner
+// © SMC Ultimate Trading Toolkit v7 — All-in-One Institutional Market Scanner
 
 //@version=6
-indicator("All-in-One Institutional Market Scanner", shorttitle="SMC Scanner", overlay=true, max_lines_count=500, max_boxes_count=500, max_labels_count=500, max_bars_back=5000)
+indicator("All-in-One Institutional Market Scanner", shorttitle="SMC Scanner v7", overlay=true, max_lines_count=500, max_boxes_count=500, max_labels_count=500, max_bars_back=5000)
 
 // ══════════════════════════════════════════════════════════════════════════════
 // ░░░░░░░░░░░░░░░░░░░░░░░░░░ MODULE TOGGLES ░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
@@ -21,6 +21,10 @@ show_sweep_rev     = input.bool(true,  "⑧ Sweep + Reversal Trigger",    group=
 show_premium_disc  = input.bool(true,  "⑨ Premium / Discount Zones",    group=grp_modules, inline="m9")
 show_market_phase  = input.bool(true,  "⑩ Market Phase Detector",       group=grp_modules, inline="m10")
 show_volume_climax = input.bool(true,  "⑪ Volume Climax & Exhaustion",  group=grp_modules, inline="m11")
+show_signals       = input.bool(true,  "⑫ Auto-Signal Engine",          group=grp_modules, inline="m12")
+show_tp_sl         = input.bool(true,  "⑬ Entry / SL / TP System",     group=grp_modules, inline="m13")
+show_htf_bias      = input.bool(true,  "⑭ HTF Bias Filter",            group=grp_modules, inline="m14")
+show_killzones     = input.bool(true,  "⑮ Killzone / Session Filter",  group=grp_modules, inline="m15")
 
 // ══════════════════════════════════════════════════════════════════════════════
 // ░░░░░░░░░░░░░░░░░░░░░░░░░░ SETTINGS GROUPS ░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
@@ -108,6 +112,36 @@ ote_fib_end       = input.float(0.786, "OTE Fib End",    minval=0.6, maxval=0.9,
 ote_bull_color    = input.color(color.new(#00BCD4, 80),   "Bull OTE",             group=grp_ote, inline="ot2")
 ote_bear_color    = input.color(color.new(#FF9800, 80),   "Bear OTE",             group=grp_ote, inline="ot2")
 
+// --- Auto-Signal Engine (Module 12) ---
+grp_sig = "═══ ⑫ AUTO-SIGNAL ENGINE ═══"
+sig_min_confluence = input.int(3,  "Min Confluence Factors", minval=1, maxval=7, group=grp_sig, inline="sg1")
+sig_cooldown       = input.int(10, "Cooldown Bars",          minval=1, maxval=50, group=grp_sig, inline="sg1")
+
+// --- Entry / SL / TP System (Module 13) ---
+grp_tpsl = "═══ ⑬ ENTRY / SL / TP ═══"
+sl_atr_mult = input.float(1.5, "SL ATR Mult",   minval=0.5, maxval=5.0, step=0.1, group=grp_tpsl, inline="tp1")
+tp1_rr      = input.float(1.5, "TP1 R:R",       minval=0.5, maxval=10.0, step=0.1, group=grp_tpsl, inline="tp2")
+tp2_rr      = input.float(2.5, "TP2 R:R",       minval=0.5, maxval=10.0, step=0.1, group=grp_tpsl, inline="tp2")
+tp3_rr      = input.float(4.0, "TP3 R:R",       minval=0.5, maxval=10.0, step=0.1, group=grp_tpsl, inline="tp3")
+
+// --- HTF Bias Filter (Module 14) ---
+grp_htf = "═══ ⑭ HTF BIAS FILTER ═══"
+htf_timeframe     = input.string("60", "HTF Timeframe", options=["15","60","240","D"], group=grp_htf, inline="htf1")
+htf_filter_strict = input.bool(true, "Strict Filter (block signals)", group=grp_htf, inline="htf1")
+
+// --- Killzone / Session Filter (Module 15) ---
+grp_kz = "═══ ⑮ KILLZONES ═══"
+kz_london_start   = input.int(7,  "London Start (UTC)",  minval=0, maxval=23, group=grp_kz, inline="kz1")
+kz_london_end     = input.int(10, "London End (UTC)",    minval=0, maxval=23, group=grp_kz, inline="kz1")
+kz_ny_start       = input.int(12, "New York Start (UTC)", minval=0, maxval=23, group=grp_kz, inline="kz2")
+kz_ny_end         = input.int(15, "New York End (UTC)",  minval=0, maxval=23, group=grp_kz, inline="kz2")
+kz_asia_start     = input.int(0,  "Asia Start (UTC)",    minval=0, maxval=23, group=grp_kz, inline="kz3")
+kz_asia_end       = input.int(3,  "Asia End (UTC)",      minval=0, maxval=23, group=grp_kz, inline="kz3")
+kz_filter_signals = input.bool(false, "Only Signal in Killzones", group=grp_kz, inline="kz4")
+kz_london_color   = input.color(color.new(#2196F3, 93), "London BG",  group=grp_kz, inline="kz5")
+kz_ny_color       = input.color(color.new(#FF9800, 93), "NY BG",      group=grp_kz, inline="kz5")
+kz_asia_color     = input.color(color.new(#E040FB, 93), "Asia BG",    group=grp_kz, inline="kz5")
+
 // --- Dashboard ---
 grp_dash = "═══ DASHBOARD ═══"
 show_dashboard    = input.bool(true, "Show Dashboard",     group=grp_dash, inline="ds1")
@@ -138,11 +172,24 @@ var array<label> _labels = array.new<label>()
 prev_day_h = request.security(syminfo.tickerid, "D", high[1], lookahead=barmerge.lookahead_on)
 prev_day_l = request.security(syminfo.tickerid, "D", low[1],  lookahead=barmerge.lookahead_on)
 
+// --- HTF Bias: request.security at global scope (Module 14) ---
+htf_ema21_raw = ta.ema(close, 21)
+htf_ema50_raw = ta.ema(close, 50)
+htf_ema21 = request.security(syminfo.tickerid, htf_timeframe, htf_ema21_raw, lookahead=barmerge.lookahead_off)
+htf_ema50 = request.security(syminfo.tickerid, htf_timeframe, htf_ema50_raw, lookahead=barmerge.lookahead_off)
+
 // --- ta.sma for ATR smoothing at global scope ---
 atr_sma_20 = ta.sma(atr_val, 20)
 
 // --- Day change detection at global scope ---
 new_day_flag = ta.change(time("D")) != 0
+
+// --- Killzone time detection at global scope (Module 15) ---
+kz_utc_hour = hour(time, "UTC")
+kz_in_london = kz_utc_hour >= kz_london_start and kz_utc_hour < kz_london_end
+kz_in_ny     = kz_utc_hour >= kz_ny_start     and kz_utc_hour < kz_ny_end
+kz_in_asia   = kz_utc_hour >= kz_asia_start   and kz_utc_hour < kz_asia_end
+kz_in_any    = kz_in_london or kz_in_ny or kz_in_asia
 
 // ══════════════════════════════════════════════════════════════════════════════
 // ░░░░░░░░░░░░░░░░░░░░░░░░░░ SWING DETECTION ░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
@@ -561,10 +608,6 @@ pd_mid         = na(pd_high) or na(pd_low) ? na : (pd_high + pd_low) / 2.0
 pd_is_premium  = not na(pd_mid) and close > pd_mid
 pd_is_discount = not na(pd_mid) and close <= pd_mid
 
-// Background coloring (user toggle)
-bgcolor(show_premium_disc and pd_show_bg and pd_is_premium  ? pd_premium_color  : na, title="Premium BG")
-bgcolor(show_premium_disc and pd_show_bg and pd_is_discount ? pd_discount_color : na, title="Discount BG")
-
 // ══════════════════════════════════════════════════════════════════════════════
 // ░░░░░░░░░░░░░░░░░░░░ MODULE 11: VOLUME CLIMAX & EXHAUSTION ░░░░░░░░░░░░░░░
 // ══════════════════════════════════════════════════════════════════════════════
@@ -629,6 +672,20 @@ if show_market_phase
         market_phase := "Consolidation"
     else
         market_phase := "Transition"
+
+// ══════════════════════════════════════════════════════════════════════════════
+// ░░░░░░░░░░░░░░░░░░░░ MODULE 14: HTF BIAS FILTER ░░░░░░░░░░░░░░░░░░░░░░░░░░
+// ══════════════════════════════════════════════════════════════════════════════
+
+htf_bias_bull = not na(htf_ema21) and not na(htf_ema50) and htf_ema21 > htf_ema50
+htf_bias_bear = not na(htf_ema21) and not na(htf_ema50) and htf_ema21 < htf_ema50
+htf_bias_str  = htf_bias_bull ? "BULLISH" : htf_bias_bear ? "BEARISH" : "NEUTRAL"
+
+// ══════════════════════════════════════════════════════════════════════════════
+// ░░░░░░░░░░░░░░░░░░░░ MODULE 15: KILLZONE / SESSION FILTER ░░░░░░░░░░░░░░░░
+// ══════════════════════════════════════════════════════════════════════════════
+
+kz_active_name = kz_in_london ? "London" : kz_in_ny ? "New York" : kz_in_asia ? "Asia" : "OFF"
 
 // ══════════════════════════════════════════════════════════════════════════════
 // ░░░░░░░░░░░░░░░░░░░░ MODULE 2: CONFLUENCE ENGINE ░░░░░░░░░░░░░░░░░░░░░░░░░
@@ -704,9 +761,230 @@ if show_confluence
         if trend_dir == -1 and fib_pos >= ote_fib_start and fib_pos <= ote_fib_end
             conf_score += 1
 
-// Confluence highlight (background)
-conf_bg_col = conf_score >= 5 ? color.new(conf_strong_color, 70) : conf_score >= 3 ? color.new(conf_strong_color, 82) : conf_score >= conf_min_factors ? color.new(#9E9E9E, 88) : na
-bgcolor(show_confluence and conf_score >= conf_min_factors ? conf_bg_col : na, title="Confluence Zone")
+// ══════════════════════════════════════════════════════════════════════════════
+// ░░░░░░░░░░░░░░░░░░░░ MODULE 12: AUTO-SIGNAL ENGINE ░░░░░░░░░░░░░░░░░░░░░░░
+// ══════════════════════════════════════════════════════════════════════════════
+
+var int last_sig_bar     = 0
+var int last_sig_dir     = 0   // 1=buy, -1=sell
+
+// Check if price touches bullish OB or bullish FVG
+touch_bull_ob_fvg = false
+touch_bear_ob_fvg = false
+
+// Check bullish OB touch
+for i = math.max(0, array.size(ob_arr) - 10) to math.max(0, array.size(ob_arr) - 1)
+    if i >= array.size(ob_arr)
+        break
+    ob = array.get(ob_arr, i)
+    if not ob.is_mitigated and ob.is_bull
+        if low <= ob.top and close >= ob.bottom
+            touch_bull_ob_fvg := true
+            break
+
+// Check bearish OB touch
+for i = math.max(0, array.size(ob_arr) - 10) to math.max(0, array.size(ob_arr) - 1)
+    if i >= array.size(ob_arr)
+        break
+    ob = array.get(ob_arr, i)
+    if not ob.is_mitigated and not ob.is_bull
+        if high >= ob.bottom and close <= ob.top
+            touch_bear_ob_fvg := true
+            break
+
+// Check bullish FVG touch
+for i = math.max(0, array.size(fvg_arr) - 10) to math.max(0, array.size(fvg_arr) - 1)
+    if i >= array.size(fvg_arr)
+        break
+    fvg = array.get(fvg_arr, i)
+    if not fvg.is_filled and fvg.is_bull
+        if low <= fvg.top and close >= fvg.bottom
+            touch_bull_ob_fvg := true
+            break
+
+// Check bearish FVG touch
+for i = math.max(0, array.size(fvg_arr) - 10) to math.max(0, array.size(fvg_arr) - 1)
+    if i >= array.size(fvg_arr)
+        break
+    fvg = array.get(fvg_arr, i)
+    if not fvg.is_filled and not fvg.is_bull
+        if high >= fvg.bottom and close <= fvg.top
+            touch_bear_ob_fvg := true
+            break
+
+// Cooldown check
+cooldown_passed = bar_index - last_sig_bar >= sig_cooldown
+
+// HTF filter
+htf_allows_buy  = not show_htf_bias or not htf_filter_strict or htf_bias_bull
+htf_allows_sell = not show_htf_bias or not htf_filter_strict or htf_bias_bear
+
+// Killzone filter
+kz_allows_signal = not show_killzones or not kz_filter_signals or kz_in_any
+
+// BUY trigger
+buy_trigger  = sweep_rev_bull or choch_bull or touch_bull_ob_fvg
+sell_trigger = sweep_rev_bear or choch_bear or touch_bear_ob_fvg
+
+// Final signal conditions
+sig_buy  = show_signals and trend_dir == 1  and pd_is_discount and conf_score >= sig_min_confluence and buy_trigger  and cooldown_passed and htf_allows_buy  and kz_allows_signal
+sig_sell = show_signals and trend_dir == -1 and pd_is_premium  and conf_score >= sig_min_confluence and sell_trigger and cooldown_passed and htf_allows_sell and kz_allows_signal
+
+// Update last signal bar
+if sig_buy
+    last_sig_bar := bar_index
+    last_sig_dir := 1
+
+if sig_sell
+    last_sig_bar := bar_index
+    last_sig_dir := -1
+
+// ══════════════════════════════════════════════════════════════════════════════
+// ░░░░░░░░░░░░░░░░░░░░ MODULE 13: ENTRY / SL / TP SYSTEM ░░░░░░░░░░░░░░░░░░░
+// ══════════════════════════════════════════════════════════════════════════════
+
+var float entry_price  = na
+var float sl_price     = na
+var float tp1_price    = na
+var float tp2_price    = na
+var float tp3_price    = na
+var int   trade_dir    = 0   // 1=long, -1=short
+var bool  tp1_hit      = false
+var bool  tp2_hit      = false
+var bool  tp3_hit      = false
+var bool  sl_hit       = false
+var int   entry_bar    = 0
+
+// Lines for TP/SL drawing
+var line  ln_entry     = na
+var line  ln_sl        = na
+var line  ln_tp1       = na
+var line  ln_tp2       = na
+var line  ln_tp3       = na
+var label lbl_entry    = na
+var label lbl_sl       = na
+var label lbl_tp1      = na
+var label lbl_tp2      = na
+var label lbl_tp3      = na
+
+// Helper: find nearest bearish OB bottom below price for buy SL
+find_bear_ob_below(p) =>
+    result = p - nz(atr_val) * sl_atr_mult
+    for i = math.max(0, array.size(ob_arr) - 1) to 0
+        if i >= array.size(ob_arr)
+            continue
+        ob = array.get(ob_arr, i)
+        if not ob.is_mitigated and not ob.is_bull and ob.bottom < p
+            result := ob.bottom
+            break
+    result
+
+// Helper: find nearest bullish OB top above price for sell SL
+find_bull_ob_above(p) =>
+    result = p + nz(atr_val) * sl_atr_mult
+    for i = math.max(0, array.size(ob_arr) - 1) to 0
+        if i >= array.size(ob_arr)
+            continue
+        ob = array.get(ob_arr, i)
+        if not ob.is_mitigated and ob.is_bull and ob.top > p
+            result := ob.top
+            break
+    result
+
+// Delete old lines/labels on new signal
+clear_tp_sl() =>
+    line.delete(ln_entry)
+    line.delete(ln_sl)
+    line.delete(ln_tp1)
+    line.delete(ln_tp2)
+    line.delete(ln_tp3)
+    label.delete(lbl_entry)
+    label.delete(lbl_sl)
+    label.delete(lbl_tp1)
+    label.delete(lbl_tp2)
+    label.delete(lbl_tp3)
+
+if show_tp_sl
+    // New BUY signal
+    if sig_buy
+        clear_tp_sl()
+        entry_price := close
+        sl_price    := find_bear_ob_below(close)
+        risk        = entry_price - sl_price
+        if risk <= 0
+            risk := nz(atr_val) * sl_atr_mult
+            sl_price := entry_price - risk
+        tp1_price := entry_price + risk * tp1_rr
+        tp2_price := entry_price + risk * tp2_rr
+        tp3_price := entry_price + risk * tp3_rr
+        trade_dir := 1
+        tp1_hit   := false
+        tp2_hit   := false
+        tp3_hit   := false
+        sl_hit    := false
+        entry_bar := bar_index
+
+    // New SELL signal
+    if sig_sell
+        clear_tp_sl()
+        entry_price := close
+        sl_price    := find_bull_ob_above(close)
+        risk        = sl_price - entry_price
+        if risk <= 0
+            risk := nz(atr_val) * sl_atr_mult
+            sl_price := entry_price + risk
+        tp1_price := entry_price - risk * tp1_rr
+        tp2_price := entry_price - risk * tp2_rr
+        tp3_price := entry_price - risk * tp3_rr
+        trade_dir := -1
+        tp1_hit   := false
+        tp2_hit   := false
+        tp3_hit   := false
+        sl_hit    := false
+        entry_bar := bar_index
+
+    // Track TP/SL hits
+    if not na(entry_price) and not sl_hit
+        if trade_dir == 1
+            if not tp1_hit and high >= tp1_price
+                tp1_hit := true
+            if not tp2_hit and high >= tp2_price
+                tp2_hit := true
+            if not tp3_hit and high >= tp3_price
+                tp3_hit := true
+            if low <= sl_price
+                sl_hit := true
+
+        if trade_dir == -1
+            if not tp1_hit and low <= tp1_price
+                tp1_hit := true
+            if not tp2_hit and low <= tp2_price
+                tp2_hit := true
+            if not tp3_hit and low <= tp3_price
+                tp3_hit := true
+            if high >= sl_price
+                sl_hit := true
+
+// ══════════════════════════════════════════════════════════════════════════════
+// ░░░░░░░░░░░░░░░░░░░░ SIGNAL ALERTS (alert() inside if) ░░░░░░░░░░░░░░░░░░░
+// ══════════════════════════════════════════════════════════════════════════════
+
+if sig_buy
+    alert("BUY SIGNAL | " + syminfo.ticker + " | Entry: " + str.tostring(close, "#.#####") + " | SL: " + str.tostring(nz(sl_price), "#.#####") + " | TP1: " + str.tostring(nz(tp1_price), "#.#####") + " | Conf: " + str.tostring(conf_score), alert.freq_once_per_bar)
+
+if sig_sell
+    alert("SELL SIGNAL | " + syminfo.ticker + " | Entry: " + str.tostring(close, "#.#####") + " | SL: " + str.tostring(nz(sl_price), "#.#####") + " | TP1: " + str.tostring(nz(tp1_price), "#.#####") + " | Conf: " + str.tostring(conf_score), alert.freq_once_per_bar)
+
+if show_tp_sl and not na(entry_price) and not sl_hit
+    if tp1_hit and tp1_hit != tp1_hit[1]
+        alert("TP1 HIT | " + syminfo.ticker + " | Entry: " + str.tostring(entry_price, "#.#####") + " | TP1: " + str.tostring(tp1_price, "#.#####"), alert.freq_once_per_bar)
+    if tp2_hit and tp2_hit != tp2_hit[1]
+        alert("TP2 HIT | " + syminfo.ticker + " | Entry: " + str.tostring(entry_price, "#.#####") + " | TP2: " + str.tostring(tp2_price, "#.#####"), alert.freq_once_per_bar)
+    if tp3_hit and tp3_hit != tp3_hit[1]
+        alert("TP3 HIT | " + syminfo.ticker + " | Entry: " + str.tostring(entry_price, "#.#####") + " | TP3: " + str.tostring(tp3_price, "#.#####"), alert.freq_once_per_bar)
+
+if show_tp_sl and sl_hit and sl_hit != sl_hit[1]
+    alert("SL HIT | " + syminfo.ticker + " | Entry: " + str.tostring(entry_price, "#.#####") + " | SL: " + str.tostring(sl_price, "#.#####"), alert.freq_once_per_bar)
 
 // ══════════════════════════════════════════════════════════════════════════════
 // ░░░░░░░░░░░░░░░░░░░░ BARSTATE.ISLAST — DRAW ALL ZONES ░░░░░░░░░░░░░░░░░░░░
@@ -816,6 +1094,38 @@ if barstate.islast
         c_col = conf_score >= 5 ? #FFD600 : conf_score >= 3 ? #FF9800 : #9E9E9E
         array.push(_labels, label.new(bar_index, high + atr_val * 0.5, c_txt, style=label.style_label_down, color=color.new(c_col, 20), textcolor=color.white, size=size.small))
 
+    // ──── Draw Entry / SL / TP Lines (Module 13) ────
+    if show_tp_sl and not na(entry_price) and trade_dir != 0
+        extend_bar = entry_bar + 20
+        // Entry line
+        entry_col = color.white
+        ln_entry := line.new(entry_bar, entry_price, extend_bar, entry_price, color=entry_col, style=line.style_solid, width=2)
+        lbl_entry := label.new(extend_bar, entry_price, "Entry: " + str.tostring(entry_price, "#.#####"), style=label.style_label_left, color=color.new(color.black, 100), textcolor=color.white, size=size.tiny)
+
+        // SL line
+        sl_col_draw = sl_hit ? color.new(color.red, 70) : color.red
+        ln_sl := line.new(entry_bar, sl_price, extend_bar, sl_price, color=sl_col_draw, style=line.style_dashed, width=2)
+        sl_lbl_txt = "SL: " + str.tostring(sl_price, "#.#####") + (sl_hit ? " [HIT]" : "")
+        lbl_sl := label.new(extend_bar, sl_price, sl_lbl_txt, style=label.style_label_left, color=color.new(color.black, 100), textcolor=sl_col_draw, size=size.tiny)
+
+        // TP1 line
+        tp1_col_draw = tp1_hit ? color.new(color.green, 70) : color.green
+        ln_tp1 := line.new(entry_bar, tp1_price, extend_bar, tp1_price, color=tp1_col_draw, style=line.style_dotted, width=1)
+        tp1_lbl_txt = "TP1 (" + str.tostring(tp1_rr, "#.#") + "R): " + str.tostring(tp1_price, "#.#####") + (tp1_hit ? " [HIT]" : "")
+        lbl_tp1 := label.new(extend_bar, tp1_price, tp1_lbl_txt, style=label.style_label_left, color=color.new(color.black, 100), textcolor=tp1_col_draw, size=size.tiny)
+
+        // TP2 line
+        tp2_col_draw = tp2_hit ? color.new(color.lime, 70) : color.lime
+        ln_tp2 := line.new(entry_bar, tp2_price, extend_bar, tp2_price, color=tp2_col_draw, style=line.style_dotted, width=1)
+        tp2_lbl_txt = "TP2 (" + str.tostring(tp2_rr, "#.#") + "R): " + str.tostring(tp2_price, "#.#####") + (tp2_hit ? " [HIT]" : "")
+        lbl_tp2 := label.new(extend_bar, tp2_price, tp2_lbl_txt, style=label.style_label_left, color=color.new(color.black, 100), textcolor=tp2_col_draw, size=size.tiny)
+
+        // TP3 line
+        tp3_col_draw = tp3_hit ? color.new(color.aqua, 70) : color.aqua
+        ln_tp3 := line.new(entry_bar, tp3_price, extend_bar, tp3_price, color=tp3_col_draw, style=line.style_dotted, width=1)
+        tp3_lbl_txt = "TP3 (" + str.tostring(tp3_rr, "#.#") + "R): " + str.tostring(tp3_price, "#.#####") + (tp3_hit ? " [HIT]" : "")
+        lbl_tp3 := label.new(extend_bar, tp3_price, tp3_lbl_txt, style=label.style_label_left, color=color.new(color.black, 100), textcolor=tp3_col_draw, size=size.tiny)
+
 // ══════════════════════════════════════════════════════════════════════════════
 // ░░░░░░░░░░░░░░░░░░░░ MARKET PHASE TABLE ░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
 // ══════════════════════════════════════════════════════════════════════════════
@@ -831,7 +1141,7 @@ if show_market_phase
         => position.top_right
 
     if na(phase_tbl)
-        phase_tbl := table.new(phase_pos, 2, 5, bgcolor=color.new(#1E1E1E, 10), border_width=1, border_color=color.new(color.gray, 50))
+        phase_tbl := table.new(phase_pos, 2, 6, bgcolor=color.new(#1E1E1E, 10), border_width=1, border_color=color.new(color.gray, 50))
 
     phase_col = switch market_phase
         "Accumulation"  => color.new(#00BCD4, 0)
@@ -865,8 +1175,14 @@ if show_market_phase
     table.cell(phase_tbl, 0, 4, "CONFLUENCE", text_color=color.white, text_size=size.tiny)
     table.cell(phase_tbl, 1, 4, conf_dash + " (" + str.tostring(conf_score) + ")", text_color=conf_d_col, text_size=size.tiny)
 
+    // HTF Bias row (Module 14)
+    htf_row_col = htf_bias_bull ? color.green : htf_bias_bear ? color.red : color.gray
+    htf_row_txt = show_htf_bias ? htf_bias_str : "OFF"
+    table.cell(phase_tbl, 0, 5, "HTF BIAS",   text_color=color.white,  text_size=size.tiny)
+    table.cell(phase_tbl, 1, 5, htf_row_txt,   text_color=htf_row_col, text_size=size.tiny)
+
 // ══════════════════════════════════════════════════════════════════════════════
-// ░░░░░░░░░░░░░░░░░░░░ DASHBOARD TABLE ░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
+// ░░░░░░░░░░░░░░░░░░░░ EXPANDED DASHBOARD TABLE ░░░░░░░░░░░░░░░░░░░░░░░░░░░░
 // ══════════════════════════════════════════════════════════════════════════════
 
 var table dash_tbl = na
@@ -883,12 +1199,36 @@ if show_dashboard
     actual_pos = show_market_phase and dash_position == phase_tbl_pos ? position.bottom_left : d_pos
 
     if na(dash_tbl)
-        dash_tbl := table.new(actual_pos, 2, 8, bgcolor=color.new(#1E1E1E, 10), border_width=1, border_color=color.new(color.gray, 50))
+        dash_tbl := table.new(actual_pos, 2, 15, bgcolor=color.new(#1E1E1E, 10), border_width=1, border_color=color.new(color.gray, 50))
 
+    // Row 0: Header
     table.cell(dash_tbl, 0, 0, "SMC SCANNER", text_color=#FFD600, text_size=size.small)
-    table.cell(dash_tbl, 1, 0, "v6.0",        text_color=color.gray, text_size=size.tiny)
+    table.cell(dash_tbl, 1, 0, "v7.0",        text_color=color.gray, text_size=size.tiny)
 
-    // Active OBs
+    // Row 1: Signal status
+    sig_txt = sig_buy ? "BUY" : sig_sell ? "SELL" : (last_sig_dir == 1 ? "LAST: BUY" : last_sig_dir == -1 ? "LAST: SELL" : "WAIT")
+    sig_col = sig_buy ? color.lime : sig_sell ? color.red : (last_sig_dir == 1 ? color.new(color.green, 50) : last_sig_dir == -1 ? color.new(color.red, 50) : color.gray)
+    table.cell(dash_tbl, 0, 1, "Signal",    text_color=color.white, text_size=size.tiny)
+    table.cell(dash_tbl, 1, 1, sig_txt,      text_color=sig_col,    text_size=size.tiny)
+
+    // Row 2: Entry / SL / R:R
+    entry_sl_txt = not na(entry_price) and trade_dir != 0 ? str.tostring(entry_price, "#.###") + " / " + str.tostring(sl_price, "#.###") : "—"
+    table.cell(dash_tbl, 0, 2, "Entry/SL",  text_color=color.white, text_size=size.tiny)
+    table.cell(dash_tbl, 1, 2, entry_sl_txt, text_color=color.white, text_size=size.tiny)
+
+    // Row 3: TP status
+    tp_status_txt = not na(entry_price) and trade_dir != 0 ? (tp1_hit ? "TP1:HIT " : "TP1:--- ") + (tp2_hit ? "TP2:HIT " : "TP2:--- ") + (tp3_hit ? "TP3:HIT" : "TP3:---") : "—"
+    tp_status_col = tp3_hit ? color.aqua : tp2_hit ? color.lime : tp1_hit ? color.green : sl_hit ? color.red : color.gray
+    table.cell(dash_tbl, 0, 3, "TP Status", text_color=color.white,   text_size=size.tiny)
+    table.cell(dash_tbl, 1, 3, tp_status_txt, text_color=tp_status_col, text_size=size.tiny)
+
+    // Row 4: HTF Bias
+    htf_d_col = htf_bias_bull ? color.green : htf_bias_bear ? color.red : color.gray
+    htf_d_txt = show_htf_bias ? htf_bias_str + " (" + htf_timeframe + ")" : "OFF"
+    table.cell(dash_tbl, 0, 4, "HTF Bias",   text_color=color.white, text_size=size.tiny)
+    table.cell(dash_tbl, 1, 4, htf_d_txt,     text_color=htf_d_col,  text_size=size.tiny)
+
+    // Row 5: Active OBs
     active_obs = 0
     for i = 0 to math.max(0, array.size(ob_arr) - 1)
         if i >= array.size(ob_arr)
@@ -896,10 +1236,10 @@ if show_dashboard
         ob = array.get(ob_arr, i)
         if not ob.is_mitigated
             active_obs += 1
-    table.cell(dash_tbl, 0, 1, "Order Blocks", text_color=color.white, text_size=size.tiny)
-    table.cell(dash_tbl, 1, 1, str.tostring(active_obs) + " active", text_color=active_obs > 0 ? color.green : color.gray, text_size=size.tiny)
+    table.cell(dash_tbl, 0, 5, "Order Blocks", text_color=color.white, text_size=size.tiny)
+    table.cell(dash_tbl, 1, 5, str.tostring(active_obs) + " active", text_color=active_obs > 0 ? color.green : color.gray, text_size=size.tiny)
 
-    // Active S/D
+    // Row 6: Active S/D
     active_sd = 0
     for i = 0 to math.max(0, array.size(sd_arr) - 1)
         if i >= array.size(sd_arr)
@@ -907,10 +1247,10 @@ if show_dashboard
         sd = array.get(sd_arr, i)
         if sd.status < 2
             active_sd += 1
-    table.cell(dash_tbl, 0, 2, "S/D Zones", text_color=color.white, text_size=size.tiny)
-    table.cell(dash_tbl, 1, 2, str.tostring(active_sd) + " active", text_color=active_sd > 0 ? color.green : color.gray, text_size=size.tiny)
+    table.cell(dash_tbl, 0, 6, "S/D Zones", text_color=color.white, text_size=size.tiny)
+    table.cell(dash_tbl, 1, 6, str.tostring(active_sd) + " active", text_color=active_sd > 0 ? color.green : color.gray, text_size=size.tiny)
 
-    // Active FVGs
+    // Row 7: Active FVGs
     active_fvg = 0
     for i = 0 to math.max(0, array.size(fvg_arr) - 1)
         if i >= array.size(fvg_arr)
@@ -918,10 +1258,10 @@ if show_dashboard
         fvg = array.get(fvg_arr, i)
         if not fvg.is_filled
             active_fvg += 1
-    table.cell(dash_tbl, 0, 3, "FVGs", text_color=color.white, text_size=size.tiny)
-    table.cell(dash_tbl, 1, 3, str.tostring(active_fvg) + " open", text_color=active_fvg > 0 ? color.blue : color.gray, text_size=size.tiny)
+    table.cell(dash_tbl, 0, 7, "FVGs", text_color=color.white, text_size=size.tiny)
+    table.cell(dash_tbl, 1, 7, str.tostring(active_fvg) + " open", text_color=active_fvg > 0 ? color.blue : color.gray, text_size=size.tiny)
 
-    // Liquidity
+    // Row 8: Liquidity
     active_liq = 0
     for i = 0 to math.max(0, array.size(liq_arr) - 1)
         if i >= array.size(liq_arr)
@@ -929,27 +1269,75 @@ if show_dashboard
         lv = array.get(liq_arr, i)
         if not lv.is_swept
             active_liq += 1
-    table.cell(dash_tbl, 0, 4, "Liquidity", text_color=color.white, text_size=size.tiny)
-    table.cell(dash_tbl, 1, 4, str.tostring(active_liq) + " levels", text_color=active_liq > 0 ? #FFD600 : color.gray, text_size=size.tiny)
+    table.cell(dash_tbl, 0, 8, "Liquidity", text_color=color.white, text_size=size.tiny)
+    table.cell(dash_tbl, 1, 8, str.tostring(active_liq) + " levels", text_color=active_liq > 0 ? #FFD600 : color.gray, text_size=size.tiny)
 
-    // ATR
-    table.cell(dash_tbl, 0, 5, "ATR(14)", text_color=color.white, text_size=size.tiny)
-    table.cell(dash_tbl, 1, 5, str.tostring(atr_val, "#.#####"), text_color=color.gray, text_size=size.tiny)
+    // Row 9: Phase
+    phase_d_col = switch market_phase
+        "Accumulation"  => color.new(#00BCD4, 0)
+        "Distribution"  => color.new(#FF9800, 0)
+        "Expansion"     => color.new(#E040FB, 0)
+        "Trending Up"   => color.new(#00E676, 0)
+        "Trending Down" => color.new(#FF5252, 0)
+        "Consolidation" => color.new(#9E9E9E, 0)
+        => color.new(#FFD600, 0)
+    table.cell(dash_tbl, 0, 9, "Phase",     text_color=color.white, text_size=size.tiny)
+    table.cell(dash_tbl, 1, 9, market_phase, text_color=phase_d_col, text_size=size.tiny)
 
-    // Volume
+    // Row 10: Confluence
+    conf_d_txt = conf_score >= 5 ? "STRONG" : conf_score >= 3 ? "MODERATE" : conf_score >= 2 ? "WEAK" : "NONE"
+    conf_dd_col = conf_score >= 5 ? #FFD600 : conf_score >= 3 ? #FF9800 : color.gray
+    table.cell(dash_tbl, 0, 10, "Confluence", text_color=color.white, text_size=size.tiny)
+    table.cell(dash_tbl, 1, 10, conf_d_txt + " (" + str.tostring(conf_score) + ")", text_color=conf_dd_col, text_size=size.tiny)
+
+    // Row 11: Volume
     v_status = vol_is_exhaust ? "EXHAUSTION" : vol_is_climax ? "CLIMAX" : volume > vol_sma_val ? "ABOVE AVG" : "BELOW AVG"
     v_col = vol_is_exhaust ? #E040FB : vol_is_climax ? #FFD600 : volume > vol_sma_val ? color.green : color.gray
-    table.cell(dash_tbl, 0, 6, "Volume", text_color=color.white, text_size=size.tiny)
-    table.cell(dash_tbl, 1, 6, v_status, text_color=v_col, text_size=size.tiny)
+    table.cell(dash_tbl, 0, 11, "Volume", text_color=color.white, text_size=size.tiny)
+    table.cell(dash_tbl, 1, 11, v_status, text_color=v_col, text_size=size.tiny)
 
-    // Sweep + Reversal status
+    // Row 12: Killzone
+    kz_d_col = kz_in_any ? color.orange : color.gray
+    kz_d_txt = show_killzones ? kz_active_name : "OFF"
+    table.cell(dash_tbl, 0, 12, "Killzone", text_color=color.white, text_size=size.tiny)
+    table.cell(dash_tbl, 1, 12, kz_d_txt,   text_color=kz_d_col,   text_size=size.tiny)
+
+    // Row 13: ATR
+    table.cell(dash_tbl, 0, 13, "ATR(14)", text_color=color.white, text_size=size.tiny)
+    table.cell(dash_tbl, 1, 13, str.tostring(atr_val, "#.#####"), text_color=color.gray, text_size=size.tiny)
+
+    // Row 14: Sweep + Reversal status
     sr_txt = sweep_rev_bull ? "BULL TRIGGER" : sweep_rev_bear ? "BEAR TRIGGER" : sweep_bull_sig ? "BULL SWEEP" : sweep_bear_sig ? "BEAR SWEEP" : "—"
     sr_col = sweep_rev_bull ? color.lime : sweep_rev_bear ? color.red : sweep_bull_sig or sweep_bear_sig ? color.orange : color.gray
-    table.cell(dash_tbl, 0, 7, "Sweep/Rev", text_color=color.white, text_size=size.tiny)
-    table.cell(dash_tbl, 1, 7, sr_txt, text_color=sr_col, text_size=size.tiny)
+    table.cell(dash_tbl, 0, 14, "Sweep/Rev", text_color=color.white, text_size=size.tiny)
+    table.cell(dash_tbl, 1, 14, sr_txt, text_color=sr_col, text_size=size.tiny)
 
 // ══════════════════════════════════════════════════════════════════════════════
-// ░░░░░░░░░░░░░░░░░░░░ ALERTS (global scope — v6 requirement) ░░░░░░░░░░░░░░
+// ░░░░░░░░░░░░░░░░░░░░ PLOTSHAPE — SIGNAL ARROWS (global scope) ░░░░░░░░░░░░
+// ══════════════════════════════════════════════════════════════════════════════
+
+plotshape(sig_buy,  title="BUY Signal",  style=shape.triangleup,   location=location.belowbar, color=color.new(#00E676, 0), size=size.large, text="BUY",  textcolor=color.new(#00E676, 0))
+plotshape(sig_sell, title="SELL Signal", style=shape.triangledown, location=location.abovebar, color=color.new(#FF5252, 0), size=size.large, text="SELL", textcolor=color.new(#FF5252, 0))
+
+// ══════════════════════════════════════════════════════════════════════════════
+// ░░░░░░░░░░░░░░░░░░░░ BGCOLOR — GLOBAL SCOPE ░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
+// ══════════════════════════════════════════════════════════════════════════════
+
+// Premium / Discount background
+bgcolor(show_premium_disc and pd_show_bg and pd_is_premium  ? pd_premium_color  : na, title="Premium BG")
+bgcolor(show_premium_disc and pd_show_bg and pd_is_discount ? pd_discount_color : na, title="Discount BG")
+
+// Confluence highlight (background)
+conf_bg_col = conf_score >= 5 ? color.new(conf_strong_color, 70) : conf_score >= 3 ? color.new(conf_strong_color, 82) : conf_score >= conf_min_factors ? color.new(#9E9E9E, 88) : na
+bgcolor(show_confluence and conf_score >= conf_min_factors ? conf_bg_col : na, title="Confluence Zone")
+
+// Killzone backgrounds (Module 15)
+bgcolor(show_killzones and kz_in_london ? kz_london_color : na, title="London KZ BG")
+bgcolor(show_killzones and kz_in_ny     ? kz_ny_color     : na, title="New York KZ BG")
+bgcolor(show_killzones and kz_in_asia   ? kz_asia_color   : na, title="Asia KZ BG")
+
+// ══════════════════════════════════════════════════════════════════════════════
+// ░░░░░░░░░░░░░░░░░░░░ ALERTCONDITION — GLOBAL SCOPE (v6 requirement) ░░░░░░░
 // ══════════════════════════════════════════════════════════════════════════════
 
 // Structure
@@ -978,6 +1366,10 @@ alertcondition(vol_div_bull,   "Vol Divergence Bull",  "Bullish volume divergenc
 
 // Confluence
 alertcondition(conf_score >= conf_min_factors, "Confluence Zone", "Price in high-probability confluence zone")
+
+// Auto-Signal (Module 12)
+alertcondition(sig_buy,  "Auto BUY Signal",  "Auto-signal BUY triggered")
+alertcondition(sig_sell, "Auto SELL Signal", "Auto-signal SELL triggered")
 
 // ══════════════════════════════════════════════════════════════════════════════
 // ░░░░░░░░░░░░░░░░░░░░░░░░░░ END ░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░

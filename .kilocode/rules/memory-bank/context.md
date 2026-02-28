@@ -2,9 +2,9 @@
 
 ## Current State
 
-**Project Status**: ✅ SMC Ultimate Trading Toolkit v6 Landing Page
+**Project Status**: ✅ SMC Scanner v7 — Full Auto-Signal System
 
-The project is a landing page / marketing site for the SMC Ultimate Trading Toolkit v6 TradingView indicator. Built with Next.js 16, TypeScript, and Tailwind CSS 4. Dark theme with yellow accent colors.
+The project is a landing page + Pine Script v6 institutional market scanner. The indicator (1376 lines) now includes 15 toggleable modules with auto BUY/SELL signals, Entry/SL/TP levels, HTF bias filter, and killzone sessions. Built with Next.js 16, TypeScript, and Tailwind CSS 4.
 
 ## Recently Completed
 
@@ -26,6 +26,15 @@ The project is a landing page / marketing site for the SMC Ultimate Trading Tool
 - [x] Drawing object cleanup system for barstate.islast redraws
 - [x] Market Phase table + Dashboard table with full scanner status
 - [x] 15 alertcondition events at global scope
+- [x] **v7 Major Upgrade** — expanded from 984 to 1376 lines with 4 new modules:
+- [x] Module 12: Auto-Signal Engine — BUY/SELL signals based on confluence scoring, trend, premium/discount, with configurable cooldown
+- [x] Module 13: Entry/SL/TP System — automatic SL from nearest OB (ATR fallback), 3 TP levels at configurable R:R ratios, line drawing, hit tracking
+- [x] Module 14: HTF Bias Filter — higher timeframe EMA 21/50 cross for directional bias, optional strict filtering
+- [x] Module 15: Killzone/Session Filter — London/NY/Asia sessions with background bands, optional signal filtering
+- [x] Signal arrows via plotshape() at global scope, dynamic alert() messages with prices
+- [x] 15-row expanded dashboard: signal status, entry/SL, TP1-3 status, HTF bias, killzone, all scanner stats
+- [x] 19 alertcondition events + 6 dynamic alert() calls at global scope
+- [x] All for-loops use math.max(0,...) bounds + inner size guards (21 loops audited)
 
 ## Current Structure
 
@@ -34,7 +43,7 @@ The project is a landing page / marketing site for the SMC Ultimate Trading Tool
 | `src/app/page.tsx` | Landing page with all sections | ✅ Complete |
 | `src/app/layout.tsx` | Root layout with SMC metadata | ✅ Complete |
 | `src/app/globals.css` | Global styles (dark theme) | ✅ Complete |
-| `SMC_Ultimate_Indicator_v6.pine` | Pine Script indicator source | ✅ Present |
+| `SMC_Ultimate_Indicator_v6.pine` | Pine Script v7 scanner (1376 lines, 15 modules) | ✅ Complete |
 | `.kilocode/` | AI context & recipes | ✅ Ready |
 
 ## Current Focus
@@ -102,3 +111,4 @@ export async function GET() {
 | 2026-02-27 | Added SMC Ultimate Trading Toolkit v6 Pine Script indicator (970 lines) |
 | 2026-02-27 | Built full landing page with hero, features, modules, dashboard, CTA sections; dark theme with yellow accents |
 | 2026-02-27 | Complete rewrite of Pine Script indicator: 11 modules, v6 compliant, 981 lines, all toggleable, with cleanup system and 15 alert conditions |
+| 2026-02-28 | v7 Major Upgrade: 1376 lines, 15 modules, auto BUY/SELL signals, Entry/SL/TP with R:R, HTF bias filter, killzones, expanded 15-row dashboard, 19 alertconditions + 6 dynamic alerts |
